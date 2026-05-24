@@ -64,7 +64,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     year_1_traffic = int(input_data.year_1_traffic)
     traffic_growth = round(float(input_data.traffic_growth),2)
     traffic_growth_pct = traffic_growth / 100  # Defaults and user entries are for percent so we divide by 100
-    system_life = input_data.system_life
+    system_life = int(input_data.system_life)
     # Get the number of service providers and their users from user input
     service_providers = int(input_data.service_providers) if input_data.service_providers is not None else 0
     sp_users_avg = input_data.service_provider_users
@@ -77,6 +77,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     potential_household_users = input_data.total_potential_users
     total_potential_users_all_types = int(potential_household_users + sp_users + bus_users)
     labour_cost = input_data.labour_cost
+    labour_monthly = labour_cost * 40 * 4.3
     terrain_type = input_data.terrain_type
     # default_tower_cost = input_data.tower_cost  # Defaults to 10,000 in the model in case it is not submitted
     households = int(input_data.households_total) if input_data.households_total is not None else 0  # Household Decision Makers
@@ -107,7 +108,6 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     solar_cost_watt = input_data.solar_cost_watt
     solar_derating = input_data.solar_derating
     solar_efficiency = input_data.solar_efficiency
-    system_life = int(input_data.system_life)
     mains_power_cost_kwh = input_data.mains_power_cost_kwh
     mains_power_installation_cost = input_data.mains_power_installation_cost
     battery_age_derating = input_data.battery_age_derating
@@ -778,12 +778,10 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     pa_ps_capex_per_decision_maker = npf.pmt(((1 + wacc)/(1 + inf)-1), system_life, (-power_capex/ndm*0.8))
 
     # (Demand Modelling O36)
-    # Share of the Revenue to the Internet Provider?
-    # logging.info(f"system_cost: {system_cost}")
-    # logging.info(f"power_system_capex: {power_system_capex}")
+    # logging.info(f"CapEx including Power: {system_capex}")
     # logging.info(f"rate: {rate}")
     # logging.info(f"system_life: {system_life}")
-    o36 = ((system_cost - power_capex) * rate / (1 - (1 + rate) ** -system_life))
+    o36 = (system_capex * rate / (1 - (1 + rate) ** -system_life))
 
     # endregion
 
@@ -814,7 +812,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # Total GB per month for the CBA Model gbm (Demand Modelling D14-D18)
     # region CBA GBM
     # Year 3 monthly traffic per user in GB
-    y3gb = (year_1_traffic * (1 + traffic_growth_pct) ** (3))
+    y3gb = (year_1_traffic * (1 + traffic_growth_pct) ** 3)
     cba_gbm_sp = cba_nu_sp * y3gb  # Demand Modelling D14
     cba_gbm_bus = cba_nu_bus * y3gb  # Demand Modelling D15
     cba_gbm_hha = cba_nu_hha * y3gb  # Demand Modelling D16
@@ -835,12 +833,12 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # Maintenance Cost Annual occb_maint_cost_a (Demand Modelling Q26)
     occb_maint_cost_a = occb_maint_cost_m * 12
     # Fixed Labour Monthly occb_labour_fixed_m (Demand Modelling P27)
-    occb_labour_fixed_m = opex_ftes_fixed * hh_income_week / 1.5 * 4 / cba_ndm_oo
+    occb_labour_fixed_m = (opex_ftes_fixed * labour_monthly) / cba_ndm_oo
     # Fixed Labour Annual occb_labour_fixed_a (Demand Modelling Q27)
     occb_labour_fixed_a = occb_labour_fixed_m * 12
     # Variable Labour Monthly occb_labour_var_m (Demand Modelling P28)
     # Monthly variable labour cost per decision maker based on FTEs per 100 users
-    occb_labour_var_m = ((cba_nu_sub / 100) * opex_ftes_variable * (hh_income_week / 1.5) * 4) / ndm
+    occb_labour_var_m = ((cba_nu_sub / 100) * opex_ftes_variable * labour_monthly) / ndm
     # Variable Labour Annual occb_labour_var_a (Demand Modelling Q28)
     occb_labour_var_a = occb_labour_var_m * 12
     # Other OCCB Monthly occb_other_m (Demand Modelling P29)
@@ -961,22 +959,9 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         cba_moec_sub = 0
         # logging.info("No DMs: cba_moec_sub = 0")
     else:
-        # logging.info(f"pa_capex_per_decision_maker: {pa_capex_per_decision_maker}")
-        # logging.info(f"pa_ps_capex_per_decision_maker: {pa_ps_capex_per_decision_maker}")
-        # logging.info(f"maint_opex: {maint_opex}")
-        capex_component = (pa_capex_per_decision_maker + pa_ps_capex_per_decision_maker) * maint_opex
-        # logging.info(f"capex_component: {capex_component}")
-        #
-        # logging.info(f"opex_ftes_fixed: {opex_ftes_fixed}, hh_income_week: {hh_income_week}")
-        fixed_labour = (opex_ftes_fixed * hh_income_week * 4) / ndm
-        # logging.info(f"fixed_labour: {fixed_labour}")
-
-        # logging.info(f"opsub: {capsub}, opex_ftes_variable: {opex_ftes_variable}, year_1_traffic: {year_1_traffic}")
-        variable_labour = (capsub / 100 * opex_ftes_variable * year_1_traffic / 4) / ndm
-        # logging.info(f"variable_labour: {variable_labour}")
-
-        cba_moec_sub = (capex_component + fixed_labour + variable_labour) * (1 - opsub)
-        # logging.info(f"cba_moec_sub: {cba_moec_sub}")
+        # Average monthly economic cost per decision maker
+        cba_moec_sub = (((cba_moec_sp * cba_ndm_sp) + (cba_moec_bus * cba_ndm_bus) + (cba_moec_hha * cba_ndm_hha) + (
+                    cba_moec_hhb * cba_ndm_hhb)) / (cba_ndm_sp + cba_ndm_bus + cba_ndm_hha + cba_ndm_hhb))
 
     # logging.info("==== CBA MOEC Complete ====")
     # endregion
@@ -1076,7 +1061,6 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     if paf_only:
         cba_pen_sub = 0
-        total_weighted_penetration = 0
     else:
         cba_pen_wt_sp = cba_pen_sp * cba_ndm_sp
         cba_pen_wt_bus = cba_pen_bus * cba_ndm_bus
@@ -1090,7 +1074,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         total_weighted_penetration = (
                 cba_pen_wt_sp + cba_pen_wt_bus + cba_pen_wt_hha + cba_pen_wt_hhb
         )
-        cba_pen_sub = total_weighted_penetration / ndm
+        total_weight = cba_ndm_sp + cba_ndm_bus + cba_ndm_hha + cba_ndm_hhb
+        cba_pen_sub = total_weighted_penetration / total_weight
         # logging.info(f'total weighted pen: {total_weighted_penetration}, ndm: {ndm}')
     # endregion
 
@@ -1433,16 +1418,16 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # logging.info(f"paf_usd_hour: {paf_usd_hour}")
 
     # Log intermediate calculations
-    deterred_component = paf_deterred_users * paf_deterred_use
+    # deterred_component = paf_deterred_users * paf_deterred_use
     # logging.info(f"deterred_component (paf_deterred_users * paf_deterred_use): {deterred_component}")
 
-    sub_component = paf_sub_users * paf_sub_pct * paf_sub_use
+    # sub_component = paf_sub_users * paf_sub_pct * paf_sub_use
     # logging.info(f"sub_component (paf_sub_users * paf_sub_pct * paf_sub_use): {sub_component}")
 
-    non_sub_component = paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use
+    # non_sub_component = paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use
     # logging.info(f"non_sub_component (paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use): {non_sub_component}")
 
-    sum_component = deterred_component + sub_component + non_sub_component
+    # sum_component = deterred_component + sub_component + non_sub_component
     # logging.info(f"sum_component: {sum_component}")
 
     # Log final calculation
@@ -1942,7 +1927,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     pl_lab_cos_by_year = get_pl_lab_cos_by_year(
         system_life, opex_ftes_fixed, opex_ftes_variable, solution_supported_users, cba_pen_sub, pop_growth_rate,
-        hh_income_week, inf, tu_rates
+        labour_cost, inf, tu_rates
     )
     # logging.info(f"pl_lab_cos_by_year = {pl_lab_cos_by_year}")
     # endregion
