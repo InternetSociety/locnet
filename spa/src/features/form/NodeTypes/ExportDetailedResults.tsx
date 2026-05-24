@@ -67,8 +67,12 @@ export const RenderExportDetailedResults = ({ node, formPath }: Props) => {
         data: 'network_type',
       },
       {
-        title: 'Users supported',
+        title: 'Users Supported',
         data: 'users_supported',
+      },
+      {
+        title: 'Users Assigned',
+        data: 'assigned_users',
       },
       {
         title: 'Cost per Passing',
