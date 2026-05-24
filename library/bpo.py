@@ -10,7 +10,7 @@ def get_pl_lab_cos_by_year(
         total_users_supported: float,
         cba_pen_sub: float,
         pop_growth_rate: float,
-        hh_income_week: float,
+        labour_cost: float,
         inf: float,
         tu_rates: dict
 ) -> dict:
@@ -42,7 +42,7 @@ def get_pl_lab_cos_by_year(
             # logging.info(f"Year {year}: labour_headcount = {labour_headcount}")
 
             # Wage cost per FTE
-            wage_cost_per_fte = (hh_income_week / 1.5) * 52 * inf_multiplier
+            wage_cost_per_fte = labour_cost * 40 * 52 * inf_multiplier
             # logging.info(f"Year {year}: wage_cost_per_fte = {wage_cost_per_fte}")
 
             # Total labour cost in millions
