@@ -627,7 +627,7 @@ def calculate_characteristics(iso_3: str):
         "gdp_cap": (gdp_cap, gdp_cap_no_default),
         "pop_growth_rate": (pop_growth_rate, pop_growth_rate_no_default),
         "power_price": (power_price, power_price_no_default),
-        "power_install": (power_install, power_install_no_default),
+        "mains_power_installation_cost": (power_install, power_install_no_default),
         "hh_income_week": (hh_income_week, hh_income_week_no_default),
         "labour_cost": (labour_cost, labour_cost_no_default),
         "paf_usd_hour": (paf_usd_hour, paf_usd_hour_no_default),
