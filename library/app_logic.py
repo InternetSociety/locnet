@@ -19,6 +19,7 @@ from library.bpo import (get_pl_lab_cos_by_year,
                          get_cf_net_by_year, get_cf_cum_by_year,
                          build_inv_row)
 from library.supply import assign_users, apply_cpe_costs, solar_model
+from library.display import get_net_summary_table, get_dc_points, get_dcba_table
 from library.classes import BuilderInput, ModelerOutput, SolarModelInput
 from math import pi, log10, ceil, sqrt
 
@@ -454,6 +455,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     total_population_covered = int(ldf.groupby('location_name')['population_covered'].max().sum().round())
 
     solution_supported_users = int(ldf['users_supported'].sum().round())
+    if solution_supported_users < 1:
+        raise ValueError("The supplied network configuration does not cover any users")
     logging.info(f"The solution supports {solution_supported_users} users across {len(ldf)} locations.")
     # Ensure total users supported doesn't exceed coverage or total potential users
     solution_supported_users = min(solution_supported_users, total_population_covered, total_potential_users_all_types)
@@ -542,6 +545,21 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     system_cost = round((system_capex + system_opex),2)
     logging.info(f"Overall system cost before maintenance and labour is {system_cost}")
 
+    # Network Summary Table
+    # region NET SUM Table
+    logging.info("Network Elements Summary Table")
+
+    net_summary_table_rows, net_summary_table_columns = get_net_summary_table(
+        country_name=country_name, system_life=system_life,
+        year_1_traffic=year_1_traffic, traffic_growth=traffic_growth,
+        backhaul_required=backhaul_required, total_backhaul_available=total_backhaul_available,
+        total_power_required=total_power_required, system_capex=system_capex,
+        access_capex=access_capex, tower_capex=tower_capex, backhaul_capex=backhaul_capex,
+        midhaul_capex=midhaul_capex, power_capex=power_capex
+    )
+
+    # endregion
+
     # Demand Modelling work
 
     # region demand model abbreviations
@@ -612,50 +630,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     dc_parameter_a = 0.0335842563942767  # Demand Modelling B27
     dc_parameter_b = 0.0158100053635772  # Demand Modelling B28
     dc_parameter_c = 0.000001  # Demand Modelling B29
-
-    para = dc_parameter_a
-    parb = dc_parameter_b
-
-    dc_inc_pct_a = 0.20
-    dc_inc_pct_b = dc_inc_pct_a * 0.85
-    dc_inc_pct_c = dc_inc_pct_b * 0.85
-    dc_inc_pct_d = dc_inc_pct_c * 0.85
-    dc_inc_pct_e = dc_inc_pct_d * 0.85
-    dc_inc_pct_f = dc_inc_pct_e * 0.85
-    dc_inc_pct_g = dc_inc_pct_f * 0.85
-    dc_inc_pct_h = dc_inc_pct_g * 0.85
-    dc_inc_pct_i = dc_inc_pct_h * 0.85
-    dc_inc_pct_j = dc_inc_pct_i * 0.85
-    dc_inc_pct_k = dc_inc_pct_j * 0.85
-    dc_inc_pct_l = dc_inc_pct_k * 0.85
-
-    dc_pen_a = demand_curve(dc_inc_pct_a, para, parb)
-    dc_pen_b = demand_curve(dc_inc_pct_b, para, parb)
-    dc_pen_c = demand_curve(dc_inc_pct_c, para, parb)
-    dc_pen_d = demand_curve(dc_inc_pct_d, para, parb)
-    dc_pen_e = demand_curve(dc_inc_pct_e, para, parb)
-    dc_pen_f = demand_curve(dc_inc_pct_f, para, parb)
-    dc_pen_g = demand_curve(dc_inc_pct_g, para, parb)
-    dc_pen_h = demand_curve(dc_inc_pct_h, para, parb)
-    dc_pen_i = demand_curve(dc_inc_pct_i, para, parb)
-    dc_pen_j = demand_curve(dc_inc_pct_j, para, parb)
-    dc_pen_k = demand_curve(dc_inc_pct_k, para, parb)
-    dc_pen_l = demand_curve(dc_inc_pct_l, para, parb)
-
-    dc_points = [
-        {"x": dc_pen_a, "y": dc_inc_pct_a},
-        {"x": dc_pen_b, "y": dc_inc_pct_b},
-        {"x": dc_pen_c, "y": dc_inc_pct_c},
-        {"x": dc_pen_d, "y": dc_inc_pct_d},
-        {"x": dc_pen_e, "y": dc_inc_pct_e},
-        {"x": dc_pen_f, "y": dc_inc_pct_f},
-        {"x": dc_pen_g, "y": dc_inc_pct_g},
-        {"x": dc_pen_h, "y": dc_inc_pct_h},
-        {"x": dc_pen_i, "y": dc_inc_pct_i},
-        {"x": dc_pen_j, "y": dc_inc_pct_j},
-        {"x": dc_pen_k, "y": dc_inc_pct_k},
-        {"x": dc_pen_l, "y": dc_inc_pct_l}
-    ]
+    # Create Demand Curve Points for rendering as a table
+    dc_points = get_dc_points(dc_parameter_a, dc_parameter_b)
     # endregion
 
     # Public Access Facilities Calculations
@@ -758,13 +734,14 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     supported_households = math.floor(supported_household_users/hh_size)
     # Divide supported_household_users by users per household to get
-    # logging.info(f"Adjusted household decision makers is {supported_households}")
+    logging.info(f"Adjusted household decision makers is {supported_households}")
 
     # Divide supported_bus_users by number of businesses to get bdm
     supported_businesses = math.floor(supported_bus_users/bus_users_avg)
-    # logging.info(f"Adjusted businesses makers is {businesses}")
+    logging.info(f"Adjusted businesses makers is {businesses}")
 
     ndm = supported_service_providers + supported_businesses + supported_households  # Demand Modelling B20
+    logging.info(f"Number of decision makers is {ndm}")
 
     # Connectivity capex per decision maker (Demand Modelling B7)
     ccpdm = cc * (1 - cocd) / ndm
@@ -778,9 +755,9 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     pa_ps_capex_per_decision_maker = npf.pmt(((1 + wacc)/(1 + inf)-1), system_life, (-power_capex/ndm*0.8))
 
     # (Demand Modelling O36)
-    # logging.info(f"CapEx including Power: {system_capex}")
-    # logging.info(f"rate: {rate}")
-    # logging.info(f"system_life: {system_life}")
+    logging.info(f"CapEx including Power: {system_capex}")
+    logging.info(f"rate: {rate}")
+    logging.info(f"system_life: {system_life}")
     o36 = (system_capex * rate / (1 - (1 + rate) ** -system_life))
 
     # endregion
@@ -796,7 +773,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     cba_ndm_hha = hdm / 2  # Demand Modelling B16
     cba_ndm_hhb = hdm / 2  # Demand Modelling B17
     # endregion
-    # logging.info(f'CBA SP: {cba_ndm_sp}, BUS: {cba_ndm_bus}, HHA: {cba_ndm_hha}, HHB: {cba_ndm_hhb} ')
+    logging.info(f'CBA SP: {cba_ndm_sp}, BUS: {cba_ndm_bus}, HHA: {cba_ndm_hha}, HHB: {cba_ndm_hhb} ')
 
     # Number of users for the CBA model nu (Demand Modelling C14-C20)
     # region CBA NU
@@ -807,7 +784,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     cba_nu_sub = cba_nu_sp + cba_nu_bus + cba_nu_hha + cba_nu_hhb  # Demand Modelling C18
     cba_nu_oo = cba_nu_sub
     # endregion
-    # logging.info(f'CBA NU Complete')
+    logging.info(f'CBA NU Complete')
 
     # Total GB per month for the CBA Model gbm (Demand Modelling D14-D18)
     # region CBA GBM
@@ -1730,154 +1707,34 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # Demand and CBA Assessment, Year 3 (2024 Dollars) Table Assembly
     # region DCBA Table
-    dcba_table_rows = [
-        {
-            "label": "Service providers",
-            "cba_ndm": cba_ndm_sp,
-            "cba_nu": cba_nu_sp,
-            "cba_gbm": cba_gbm_sp,
-            "cba_mcec": cba_mcec_sp,
-            "cba_moec": cba_moec_sp,
-            "cba_omsdm": cba_omsdm_sp,
-            "cba_tsec": cba_tsec_sp,
-            "cba_pen": cba_pen_sp,
-            "cba_dem": cba_dem_sp,
-            "cba_dgbm": cba_dgbm_sp,
-            "cba_aup": cba_aup_sp,
-            "cba_sur_ratio": cba_sur_ratio_sp,
-            "cba_sur": cba_sur_sp,
-            "cba_soc": cba_soc_priv_rat_sp,
-            "cba_tacb": cba_tacb_sp
-        },
-        {
-            "label": "Corporate/business",
-            "cba_ndm": cba_ndm_bus,
-            "cba_nu": cba_nu_bus,
-            "cba_gbm": cba_gbm_bus,
-            "cba_mcec": cba_mcec_bus,
-            "cba_moec": cba_moec_bus,
-            "cba_omsdm": cba_omsdm_bus,
-            "cba_tsec": cba_tsec_bus,
-            "cba_pen": cba_pen_bus,
-            "cba_dem": cba_dem_bus,
-            "cba_dgbm": cba_dgbm_bus,
-            "cba_aup": cba_aup_bus,
-            "cba_sur_ratio": cba_sur_ratio_bus,
-            "cba_sur": cba_sur_bus,
-            "cba_soc": cba_soc_priv_rat_bus,
-            "cba_tacb": cba_tacb_bus
-        },
-        {
-            "label": "Households (above median income)",
-            "cba_ndm": cba_ndm_hha,
-            "cba_nu": cba_nu_hha,
-            "cba_gbm": cba_gbm_hha,
-            "cba_mcec": cba_mcec_hha,
-            "cba_moec": cba_moec_hha,
-            "cba_omsdm": cba_omsdm_hha,
-            "cba_tsec": cba_tsec_hha,
-            "cba_pen": cba_pen_hha,
-            "cba_dem": cba_dem_hha,
-            "cba_dgbm": cba_dgbm_hha,
-            "cba_aup": cba_aup_hha,
-            "cba_sur_ratio": cba_sur_ratio_hha,
-            "cba_sur": cba_sur_hha,
-            "cba_soc": cba_soc_priv_rat_hha,
-            "cba_tacb": cba_tacb_hha
-        },
-        {
-            "label": "Households (below median income)",
-            "cba_ndm": cba_ndm_hhb,
-            "cba_nu": cba_nu_hhb,
-            "cba_gbm": cba_gbm_hhb,
-            "cba_mcec": cba_mcec_hhb,
-            "cba_moec": cba_moec_hhb,
-            "cba_omsdm": cba_omsdm_hhb,
-            "cba_tsec": cba_tsec_hhb,
-            "cba_pen": cba_pen_hhb,
-            "cba_dem": cba_dem_hhb,
-            "cba_dgbm": cba_dgbm_hhb,
-            "cba_aup": cba_aup_hhb,
-            "cba_sur_ratio": cba_sur_ratio_hhb,
-            "cba_sur": cba_sur_hhb,
-            "cba_soc": cba_soc_priv_rat_hhb,
-            "cba_tacb": cba_tacb_hhb
-        },
-        {
-            "label": "Sub total",
-            "cba_ndm": ndm,
-            "cba_nu": cba_nu_sub,
-            "cba_gbm": cba_gbm_sub,
-            "cba_mcec": cba_mcec_sub,
-            "cba_moec": cba_moec_sub,
-            "cba_omsdm": cba_omsdm_sub,
-            "cba_tsec": cba_tsec_sub,
-            "cba_pen": cba_pen_sub,
-            "cba_dem": cba_dem_sub,
-            "cba_dgbm": cba_dgbm_sub,
-            "cba_aup": cba_aup_sub,
-            "cba_sur_ratio": None,
-            "cba_sur": cba_sur_sub,
-            "cba_soc": None,
-            "cba_tacb": cba_tacb_sub
-        },
-        {
-            "label": "Public access facilities",
-            "cba_ndm": None,
-            "cba_nu": None,
-            "cba_gbm": None,
-            "cba_mcec": cba_mcec_paf,
-            "cba_moec": cba_moec_paf,
-            "cba_omsdm": cba_omsdm_paf,
-            "cba_tsec": cba_tsec_paf,
-            "cba_pen": None,
-            "cba_dem": cba_dem_paf,
-            "cba_dgbm": cba_dgbm_paf,
-            "cba_aup": cba_aup_paf,
-            "cba_sur_ratio": cba_sur_ratio_paf,
-            "cba_sur": cba_sur_paf,
-            "cba_soc": cba_soc_priv_rat_paf,
-            "cba_tacb": cba_tacb_paf
-        },
-        {
-            "label": "Overall",
-            "cba_ndm": ndm,
-            "cba_nu": cba_nu_oo,
-            "cba_gbm": None,
-            "cba_mcec": cba_mcec_oo,
-            "cba_moec": cba_moec_oo,
-            "cba_omsdm": None,
-            "cba_tsec": None,
-            "cba_pen": None,
-            "cba_dem": cba_dem_oo,
-            "cba_dgbm": cba_dgbm_oo,
-            "cba_aup": cba_aup_oo,
-            "cba_sur_ratio": cba_sur_ratio_oo,
-            "cba_sur": cba_sur_oo,
-            "cba_soc": None,
-            "cba_tacb": cba_tacb_oo
-        }
-    ]
-
-    dcba_table_columns = [
-        {"title": "Segment", "data": "label"},
-        {"title": "Number of decision makers", "data": "cba_ndm"},
-        {"title": "Number of users", "data": "cba_nu"},
-        {"title": "GB per month demand (100% takeup)", "data": "cba_gbm"},
-        {"title": "Monthly capex economic cost (including power and after subsidy) per decision maker",
-         "data": "cba_mcec"},
-        {"title": "Monthly Opex economic cost (after subsidy) per decision maker", "data": "cba_moec"},
-        {"title": "Other monthly spend per decision maker (after subsidy)", "data": "cba_omsdm"},
-        {"title": "Total system economic cost per month per decision maker (after subsidy)", "data": "cba_tsec"},
-        {"title": "Penetration rate", "data": "cba_pen"},
-        {"title": "Number of actual users", "data": "cba_dem"},
-        {"title": "GB per month demand (actual)", "data": "cba_dgbm"},
-        {"title": "Annual user payments to network provider", "data": "cba_aup"},
-        {"title": "Consumer Surplus ratio", "data": "cba_sur_ratio"},
-        {"title": "Consumer Surplus", "data": "cba_sur"},
-        {"title": "Social to Private Benefit ratio", "data": "cba_soc"},
-        {"title": "Total Annual Community Benefit", "data": "cba_tacb"},
-    ]
+    dcba_table_rows, dcba_table_columns = get_dcba_table(
+        ndm=ndm,
+        cba_ndm_sp=cba_ndm_sp, cba_nu_sp=cba_nu_sp, cba_gbm_sp=cba_gbm_sp, cba_mcec_sp=cba_mcec_sp,
+        cba_moec_sp=cba_moec_sp, cba_omsdm_sp=cba_omsdm_sp, cba_tsec_sp=cba_tsec_sp, cba_pen_sp=cba_pen_sp,
+        cba_dem_sp=cba_dem_sp, cba_dgbm_sp=cba_dgbm_sp, cba_aup_sp=cba_aup_sp, cba_sur_ratio_sp=cba_sur_ratio_sp,
+        cba_sur_sp=cba_sur_sp, cba_soc_priv_rat_sp=cba_soc_priv_rat_sp, cba_tacb_sp=cba_tacb_sp,
+        cba_ndm_bus=cba_ndm_bus, cba_nu_bus=cba_nu_bus, cba_gbm_bus=cba_gbm_bus, cba_mcec_bus=cba_mcec_bus,
+        cba_moec_bus=cba_moec_bus, cba_omsdm_bus=cba_omsdm_bus, cba_tsec_bus=cba_tsec_bus, cba_pen_bus=cba_pen_bus,
+        cba_dem_bus=cba_dem_bus, cba_dgbm_bus=cba_dgbm_bus, cba_aup_bus=cba_aup_bus, cba_sur_ratio_bus=cba_sur_ratio_bus,
+        cba_sur_bus=cba_sur_bus, cba_soc_priv_rat_bus=cba_soc_priv_rat_bus, cba_tacb_bus=cba_tacb_bus,
+        cba_ndm_hha=cba_ndm_hha, cba_nu_hha=cba_nu_hha, cba_gbm_hha=cba_gbm_hha, cba_mcec_hha=cba_mcec_hha,
+        cba_moec_hha=cba_moec_hha, cba_omsdm_hha=cba_omsdm_hha, cba_tsec_hha=cba_tsec_hha, cba_pen_hha=cba_pen_hha,
+        cba_dem_hha=cba_dem_hha, cba_dgbm_hha=cba_dgbm_hha, cba_aup_hha=cba_aup_hha, cba_sur_ratio_hha=cba_sur_ratio_hha,
+        cba_sur_hha=cba_sur_hha, cba_soc_priv_rat_hha=cba_soc_priv_rat_hha, cba_tacb_hha=cba_tacb_hha,
+        cba_ndm_hhb=cba_ndm_hhb, cba_nu_hhb=cba_nu_hhb, cba_gbm_hhb=cba_gbm_hhb, cba_mcec_hhb=cba_mcec_hhb,
+        cba_moec_hhb=cba_moec_hhb, cba_omsdm_hhb=cba_omsdm_hhb, cba_tsec_hhb=cba_tsec_hhb, cba_pen_hhb=cba_pen_hhb,
+        cba_dem_hhb=cba_dem_hhb, cba_dgbm_hhb=cba_dgbm_hhb, cba_aup_hhb=cba_aup_hhb, cba_sur_ratio_hhb=cba_sur_ratio_hhb,
+        cba_sur_hhb=cba_sur_hhb, cba_soc_priv_rat_hhb=cba_soc_priv_rat_hhb, cba_tacb_hhb=cba_tacb_hhb,
+        cba_nu_sub=cba_nu_sub, cba_gbm_sub=cba_gbm_sub, cba_mcec_sub=cba_mcec_sub, cba_moec_sub=cba_moec_sub,
+        cba_omsdm_sub=cba_omsdm_sub, cba_tsec_sub=cba_tsec_sub, cba_pen_sub=cba_pen_sub, cba_dem_sub=cba_dem_sub,
+        cba_dgbm_sub=cba_dgbm_sub, cba_aup_sub=cba_aup_sub, cba_sur_sub=cba_sur_sub, cba_tacb_sub=cba_tacb_sub,
+        cba_mcec_paf=cba_mcec_paf, cba_moec_paf=cba_moec_paf, cba_omsdm_paf=cba_omsdm_paf, cba_tsec_paf=cba_tsec_paf,
+        cba_dem_paf=cba_dem_paf, cba_dgbm_paf=cba_dgbm_paf, cba_aup_paf=cba_aup_paf, cba_sur_ratio_paf=cba_sur_ratio_paf,
+        cba_sur_paf=cba_sur_paf, cba_soc_priv_rat_paf=cba_soc_priv_rat_paf, cba_tacb_paf=cba_tacb_paf,
+        cba_nu_oo=cba_nu_oo, cba_mcec_oo=cba_mcec_oo, cba_moec_oo=cba_moec_oo, cba_dem_oo=cba_dem_oo,
+        cba_dgbm_oo=cba_dgbm_oo, cba_aup_oo=cba_aup_oo, cba_sur_ratio_oo=cba_sur_ratio_oo,
+        cba_sur_oo=cba_sur_oo, cba_tacb_oo=cba_tacb_oo
+    )
     # endregion
 
     # Starting the Business Planning Outcomes work
@@ -2256,122 +2113,6 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         {"label": "Average Revenue per Household", "Value": f"${arpu_hh:.2f}"},
         {"label": "Average Revenue per Individual User", "Value": f"${arpu_id:.2f}"}
     ])
-    # endregion
-
-    # Network Summary Table
-    # region NET SUM Table
-    logging.info("Network Summary Table")
-
-    net_summary_table_rows = [
-        # ---- Coverage Details ----
-        {
-            "row_type": "section",
-            "label": "Coverage Details",
-            "value": None,
-            "unit": None,
-        },
-        {
-            "row_type": "data",
-            "label": "Country",
-            "value": country_name,
-            "unit": None,
-        },
-
-        # ---- Network Properties ----
-        {
-            "row_type": "section",
-            "label": "Network Properties",
-            "value": None,
-            "unit": None,
-        },
-        {
-            "row_type": "data",
-            "label": "System Life",
-            "value": system_life,
-            "unit": "years",
-        },
-        {
-            "row_type": "data",
-            "label": "Year 1 Traffic",
-            "value": year_1_traffic,
-            "unit": "GB per user",
-        },
-        {
-            "row_type": "data",
-            "label": "Traffic Growth",
-            "value": traffic_growth,
-            "unit": "% per annum",
-        },
-        {
-            "row_type": "data",
-            "label": "Backhaul Required (year 10)",
-            "value": backhaul_required,
-            "unit": "Mbps",
-        },
-        {
-            "row_type": "data",
-            "label": "Backhaul Available",
-            "value": total_backhaul_available,
-            "unit": "Mbps",
-        },
-        {
-            "row_type": "data",
-            "label": "Total Power Required",
-            "value": total_power_required,
-            "unit": "Watts",
-        },
-
-        # ---- CapEx ----
-        {
-            "row_type": "section",
-            "label": "CapEx",
-            "value": None,
-            "unit": None,
-        },
-        {
-            "row_type": "data",
-            "label": "Consolidated CapEx",
-            "value": system_capex,
-            "unit": "USD",
-        },
-        {
-            "row_type": "data",
-            "label": "Access Network CapEx",
-            "value": access_capex,
-            "unit": "USD",
-        },
-        {
-            "row_type": "data",
-            "label": "Towers CapEx",
-            "value": tower_capex,
-            "unit": "USD",
-        },
-        {
-            "row_type": "data",
-            "label": "Backhaul CapEx",
-            "value": backhaul_capex,
-            "unit": "USD",
-        },
-        {
-            "row_type": "data",
-            "label": "Network Links CapEx",
-            "value": midhaul_capex,
-            "unit": "USD",
-        },
-        {
-            "row_type": "data",
-            "label": "Power System CapEx",
-            "value": power_capex,
-            "unit": "USD",
-        },
-    ]
-
-    net_summary_table_columns = [
-        {"title": "Metric", "data": "label"},
-        {"title": "Value", "data": "value"},
-        {"title": "Unit", "data": "unit"},
-    ]
-
     # endregion
 
     output_data = {
