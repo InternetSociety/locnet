@@ -70,10 +70,14 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     service_providers = int(input_data.service_providers) if input_data.service_providers is not None else 0
     sp_users_avg = input_data.service_provider_users
     sp_users = int(service_providers * sp_users_avg) if sp_users_avg is not None else 0
+    if sp_users == 0:
+        service_providers = 0
     # Get the number of businesses and their users from user input
     businesses = int(input_data.businesses) if input_data.businesses is not None else 0
     bus_users_avg = input_data.business_users
     bus_users = int(businesses * bus_users_avg) if bus_users_avg is not None else 0
+    if bus_users == 0:
+        businesses = 0
     # Get the total potential users
     potential_household_users = input_data.total_potential_users
     total_potential_users_all_types = int(potential_household_users + sp_users + bus_users)
@@ -698,6 +702,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # Characteristics of Service and Community Benefit Analysis Calculations CBA General Demand Modelling B7-B10
     # region CBA GENERAL
     # Number of decision makers is the sum of service providers, businesses, and household decision makers
+    # logging.info("Region CBA General")
     # logging.info("Limiting number of decision makers based on coverage provided")
     # logging.info(f"Total number of users supported by the system is {solution_supported_users}")
     # logging.info(f"Unadjusted households is {households} and size is {hh_size}")
@@ -709,8 +714,11 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # sp_users are first in line. We take the minimum of total supported or total SP users.
     supported_sp_users = min(solution_supported_users, sp_users)
     # logging.info(f"Supported Service Provider Users is {supported_sp_users}")
-    supported_service_providers = math.floor(supported_sp_users/sp_users_avg)
-    # logging.info(f"Adjusted Service Providers is {service_providers}")
+    if supported_sp_users == 0:
+        supported_service_providers = 0
+    else:
+        supported_service_providers = math.floor(supported_sp_users/sp_users_avg)
+    # logging.info(f"Adjusted Service Providers is {supported_service_providers}")
 
     # Remaining capacity for Business and Household users
     remaining_capacity = solution_supported_users - supported_sp_users
@@ -737,8 +745,12 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     logging.info(f"Adjusted household decision makers is {supported_households}")
 
     # Divide supported_bus_users by number of businesses to get bdm
-    supported_businesses = math.floor(supported_bus_users/bus_users_avg)
-    logging.info(f"Adjusted businesses makers is {businesses}")
+    if supported_bus_users == 0:
+        supported_businesses = 0
+    else:
+        supported_businesses = math.floor(supported_bus_users/bus_users_avg)
+
+    # logging.info(f"Adjusted businesses decision makers is {supported_businesses}")
 
     ndm = supported_service_providers + supported_businesses + supported_households  # Demand Modelling B20
     logging.info(f"Number of decision makers is {ndm}")
@@ -767,6 +779,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # Number of decision makers for the CBA model ndm (Demand Modelling B14-B20)
     # region CBA NDM
+    # logging.info("Region CBA NDM")
     cba_ndm_oo = ndm  # Demand Modelling B20
     cba_ndm_sp = supported_service_providers  # Demand Modelling B14
     cba_ndm_bus = supported_businesses  # Demand Modelling B15
