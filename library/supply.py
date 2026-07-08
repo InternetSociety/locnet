@@ -1,6 +1,6 @@
 import logging
 from library.helpers import fetch_grist_data
-from library.classes import SolarModelInput
+from library.classes import PowerModelInput, PowerModelResult, PowerModelRow
 import numpy as np
 import pandas as pd
 
@@ -75,10 +75,11 @@ def apply_cpe_costs(df):
     return df
 
 
-def solar_model(input_data: SolarModelInput):
-    logging.info(f'Entered the solar model')
+def power_model(input_data: PowerModelInput) -> PowerModelResult:
+    logging.info("Entered the power model")
 
     # Get variables from the input data
+    location = input_data.location
     latitude = input_data.latitude
     longitude = input_data.longitude
     logging.info(f"lat & long: {latitude}, {longitude}")
@@ -94,6 +95,9 @@ def solar_model(input_data: SolarModelInput):
     power_intermittent_hours = input_data.power_intermittent_hours
     power_hybrid_hours = input_data.power_hybrid_hours
     system_type = input_data.system_type
+    collection_w_day_m2 = None
+    panels_needed_m2 = None
+    solar_cost = 0.0
     power_capex = 0
     power_opex = 0
 
@@ -112,12 +116,14 @@ def solar_model(input_data: SolarModelInput):
         data = fetch_grist_data(sql_query)
     except Exception as e:
         logging.info(f"Failed to load {query_name} data: {str(e)}")
-        return False
+        raise
+    if not data:
+        raise ValueError(f"No solar statistics found for latitude={latitude}, longitude={longitude}")
 
-    min_sun = float(data[0]['min_sun'])
-    max_no_sun_days = float(data[0]['max_no_sun_days'])
-    annual_no_sun_days = float(data[0]['annual_no_sun_days'])
-    min_temp = float(data[0]['min_temp'])
+    min_sun = float(data[0]["min_sun"])
+    max_no_sun_days = float(data[0]["max_no_sun_days"])
+    annual_no_sun_days = float(data[0]["annual_no_sun_days"])
+    min_temp = float(data[0]["min_temp"])
     solar_efficiency = input_data.solar_efficiency / 100
     solar_derating = input_data.solar_derating / 100
     battery_age_derating = input_data.battery_age_derating / 100
@@ -139,86 +145,29 @@ def solar_model(input_data: SolarModelInput):
         else:
             return 100
 
-    # # Creating a data frame to store the calculations for later comparison
-    # podf = pd.DataFrame()
-    #
-    # def add_to_podf(podf_system_type,
-    #                 podf_power_required,
-    #                 podf_adjusted_hours,
-    #                 podf_battery_required,
-    #                 podf_battery_cost,
-    #                 podf_charger_cost,
-    #                 podf_power_opex,
-    #                 podf_min_sun,
-    #                 podf_collection_w_day_m2,
-    #                 podf_panels_needed_m2,
-    #                 podf_solar_cost_watt,
-    #                 podf_solar_cost,
-    #                 podf_power_system_capex,
-    #                 podf_total_cost):
-    #     row = pd.DataFrame([{
-    #         "system_type": podf_system_type,
-    #         "power_required": podf_power_required,
-    #         "adjusted_hours": podf_adjusted_hours,
-    #         "battery_required": podf_battery_required,
-    #         "battery_cost": podf_battery_cost,
-    #         "charger_cost": podf_charger_cost,
-    #         "power_opex": podf_power_opex,
-    #         "min_daily_sun_wm2": podf_min_sun,
-    #         "watts_day_m2": podf_collection_w_day_m2,
-    #         "panels_need_m2": podf_panels_needed_m2,
-    #         "solar_cost_pw": podf_solar_cost_watt,
-    #         "solar_cost": podf_solar_cost,
-    #         "power_system_capex": podf_power_system_capex,
-    #         "total_cost": podf_total_cost
-    #     }])
-    #     return pd.concat([podf, row], ignore_index=True)
-
-    # Populating blank variables to be used for Reilable and Hybrid systems
-    collection_w_day_m2 = ""
-    panels_needed_m2 = ""
-    solar_cost = ""
-
     if system_type == "power_mains_rel":
-        # Calculations for Reliable
         adjusted_hours = power_reliable_hours
         base_battery = power_required * adjusted_hours * battery_dod
         aged_battery = base_battery / ((1 - battery_age_derating) ** system_life)
         cold_derating = calculate_cold_derating(min_temp)
         battery_required = aged_battery / (cold_derating / 100)
-        battery_cost = round(battery_required * battery_cost_watt_hour)
-        charger_cost = round(charger_inverter_base + (power_required * 1.5))
-        power_opex = round((mains_power_cost_kwh / 1000) * power_required * 24 * 365 * system_life)
-        power_capex = round(battery_cost + charger_cost + mains_power_installation_cost)
-        # system_total_cost = power_system_capex + power_opex
-
-    # # Add to DataFrame using pd.concat
-    # podf = add_to_podf(system_type, power_required, adjusted_hours, battery_required, battery_cost, charger_cost,
-    #                    power_opex, min_sun, collection_w_day_m2, panels_needed_m2, solar_cost_watt, solar_cost,
-    #                    power_system_capex,
-    #                    system_total_cost)
+        battery_cost = battery_required * battery_cost_watt_hour
+        charger_cost = charger_inverter_base + (power_required * charger_inverter_variable)
+        power_opex = (mains_power_cost_kwh / 1000) * power_required * 24 * 365 * system_life
+        power_capex = battery_cost + charger_cost + mains_power_installation_cost
 
     elif system_type == "power_mains_int":
-        # Calculations for Intermittent
         adjusted_hours = power_intermittent_hours
         base_battery = power_required * adjusted_hours * battery_dod
         aged_battery = base_battery / ((1 - battery_age_derating) ** system_life)
         cold_derating = calculate_cold_derating(min_temp)
         battery_required = aged_battery / (cold_derating / 100)
         battery_cost = battery_required * battery_cost_watt_hour
-        charger_cost = charger_inverter_base + (power_required * 1.5)
+        charger_cost = charger_inverter_base + (power_required * charger_inverter_variable)
         power_opex = (mains_power_cost_kwh / 1000) * power_required * 24 * 365 * system_life
         power_capex = battery_cost + charger_cost + mains_power_installation_cost
-        # system_total_cost = power_system_capex + power_opex
-
-    # # Add to DataFrame using pd.concat
-    # podf = add_to_podf(system_type, power_required, adjusted_hours, battery_required, battery_cost, charger_cost,
-    #                    power_opex, min_sun, collection_w_day_m2, panels_needed_m2, solar_cost_watt, solar_cost,
-    #                    power_system_capex,
-    #                    system_total_cost)
 
     elif system_type == "power_hybrid":
-        # Calculations for Hybrid
         adjusted_hours = power_hybrid_hours
         base_battery = power_required * adjusted_hours * battery_dod
         aged_battery = base_battery / ((1 - battery_age_derating) ** system_life)
@@ -236,17 +185,10 @@ def solar_model(input_data: SolarModelInput):
         charger_cost = charger_inverter_base + (panel_watts_needed * charger_inverter_variable)
         power_opex = (mains_power_cost_kwh / 1000) * power_required * 24 * annual_no_sun_days * system_life
         power_capex = battery_cost + charger_cost + mains_power_installation_cost
-        # system_total_cost = power_system_capex + power_opex + solar_cost
-
-    # # Add to DataFrame using pd.concat
-    # podf = add_to_podf(system_type, power_required, adjusted_hours, battery_required, battery_cost, charger_cost,
-    #                    power_opex, min_sun, collection_w_day_m2, panels_needed_m2, solar_cost_watt, solar_cost,
-    #                    power_system_capex,
-    #                    system_total_cost)
 
     elif system_type == "power_solar":
-        # Calculations for Off Grid
-        power_opex = 0  # Set to zero for off-grid sites
+        power_opex = 0
+        mains_power_installation_cost = 0
         adjusted_hours = max_no_sun_days * 24
         base_battery = power_required * adjusted_hours * battery_dod
         aged_battery = base_battery / ((1 - battery_age_derating) ** system_life)
@@ -263,36 +205,48 @@ def solar_model(input_data: SolarModelInput):
         battery_cost = battery_required * battery_cost_watt_hour
         charger_cost = charger_inverter_base + (panel_watts_needed * charger_inverter_variable)
         power_capex = battery_cost + charger_cost + solar_cost
-        # system_total_cost = power_system_capex
+    else:
+        raise ValueError(f"Unsupported power system type: {system_type}")
 
-    # # Add to DataFrame using pd.concat
-    # podf = add_to_podf(system_type, power_required, adjusted_hours, battery_required, battery_cost, charger_cost,
-    #                    power_opex, min_sun, collection_w_day_m2, panels_needed_m2, solar_cost_watt, solar_cost,
-    #                    power_system_capex,
-    #                    system_total_cost)
-    #
-    # logging.info("Power system comparison table (podf)")
-    # logging.info(podf.to_string(index=False))
+    power_row = PowerModelRow(
+        location_name=location.location_name,
+        system_type=system_type,
+        latitude=latitude,
+        longitude=longitude,
+        power_required=round(float(power_required), 2),
+        system_life=system_life,
+        solar_cost_watt=solar_cost_watt,
+        solar_derating=input_data.solar_derating,
+        solar_efficiency=input_data.solar_efficiency,
+        battery_age_derating=input_data.battery_age_derating,
+        battery_cost_watt_hour=battery_cost_watt_hour,
+        battery_dod=input_data.battery_dod,
+        charger_inverter_base=charger_inverter_base,
+        charger_inverter_variable=charger_inverter_variable,
+        mains_power_cost_kwh=mains_power_cost_kwh,
+        mains_power_installation_cost=mains_power_installation_cost,
+        power_hybrid_hours=power_hybrid_hours,
+        power_intermittent_hours=power_intermittent_hours,
+        power_reliable_hours=power_reliable_hours,
+        min_daily_sun_wm2=round(min_sun, 2),
+        max_no_sun_days=round(max_no_sun_days, 2),
+        annual_no_sun_days=round(annual_no_sun_days, 2),
+        min_temp_c=round(min_temp, 2),
+        adjusted_hours=round(float(adjusted_hours), 2),
+        battery_required=round(float(battery_required), 2),
+        battery_cost=round(float(battery_cost), 2),
+        charger_cost=round(float(charger_cost), 2),
+        power_opex=round(float(power_opex), 2),
+        watts_day_m2=round(float(collection_w_day_m2), 2) if collection_w_day_m2 is not None else None,
+        panels_need_m2=round(float(panels_needed_m2), 2) if panels_needed_m2 is not None else None,
+        solar_cost=round(float(solar_cost), 2),
+        power_capex=round(float(power_capex), 2),
+    )
 
-    # # Find particular rows
-    # lowest_system_row = podf.loc[podf["total_cost"].idxmin()]
-    # off_grid_row = podf.loc[podf["system_type"] == "Off Grid"]
-    # reliable_row = podf.loc[podf["system_type"] == "Reliable"]
-    # intermittent_row = podf.loc[podf["system_type"] == "Intermittent"]
-    # hybrid_row = podf.loc[podf["system_type"] == "Hybrid"]
+    logging.info("Power model result row: %s", power_row.model_dump())
 
-    # # Extract the 'System' and 'Total Cost' from that row
-    # lowest_cost_system_type = lowest_system_row["system_type"]
-    # lowest_system_cost = lowest_system_row["total_cost"]
-    # power_opex = lowest_system_row["power_opex"]
-    # power_capex = lowest_system_row["power_system_capex"]
-    # logging.info(f'Lowest Cost System is {lowest_cost_system_type} at {lowest_system_cost} USD with CapEx {power_system_capex}.')
-    # off_grid_cost = off_grid_row["power_system_capex"].values[0]
-    # logging.info(f'Power System Cost for Off Grid system: {off_grid_cost}')
-
-    return {
-        "power_capex": round(power_capex),
-        "power_opex": round(power_opex),
-        "lowest_cost_system_type": "na",
-        "off_grid_cost": 0
-    }
+    return PowerModelResult(
+        power_capex=round(float(power_capex), 2),
+        power_opex=round(float(power_opex), 2),
+        power_row=power_row,
+    )

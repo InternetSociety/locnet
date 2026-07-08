@@ -202,6 +202,13 @@ export const locNetForm = {
           datasetFormPath: `api.modelerAPIOutput.${'detailed_results' satisfies keyof ModelerAPIOutput}`,
           isSortable: true,
         },
+        {
+          type: 'ExportTable',
+          labelText: 'Power System Bill of Materials',
+          columnsFormPath: `api.modelerAPIOutput.${'bom_table_columns' satisfies keyof ModelerAPIOutput}`,
+          rowsFormPath: `api.modelerAPIOutput.${'bom_table_rows' satisfies keyof ModelerAPIOutput}`,
+          isSortable: true,
+        },
       ],
     },
   ],
