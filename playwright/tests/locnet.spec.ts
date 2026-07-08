@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
-// Only import types from the SPA, never code (exception: sampleData is a plain data constant)
+// Only import types from the SPA, never runtime code.
 import { type BuilderInput } from "../../spa/src/features/locnet/api-generated-client";
-import { sampleData } from "../../spa/src/features/locnet/helper";
 import { type LocNetModel } from "../../spa/src/features/locnet/model";
+import { sampleData } from "./sampleData";
 import { assertNever } from "./typescript";
 
 declare global {
@@ -77,6 +77,7 @@ test("can load sample data and generate output", async ({ page }) => {
         break;
       case "users_per_household":
       case "total_potential_users":
+      case "paf_usd_hour":
         // uneditable field
         break;
       case "area_sqkm":
@@ -125,11 +126,9 @@ test("can load sample data and generate output", async ({ page }) => {
       case "paf_non_sub_use":
       case "paf_gb_hour":
       case "paf_facilities_charge":
-      case "paf_usd_hour":
       case "ue_cost":
       case "inflation":
       case "power_offgrid_hours":
-      case "provider_type":
       case "existing_ue_above_med":
       case "existing_ue_below_med":
         if (typeof newValue === "string" || typeof newValue === "number") {
@@ -141,16 +140,40 @@ test("can load sample data and generate output", async ({ page }) => {
           );
         }
         break;
+      case "provider_type": {
+        const providerCommercial = page.locator(
+          'input[name="provider_type"][value="provider_commercial"]',
+        );
+        const providerCommunity = page.locator(
+          'input[name="provider_type"][value="provider_community"]',
+        );
+
+        await providerCommercial.check({ force: true });
+        await expect(providerCommercial).toBeChecked();
+
+        await providerCommunity.check({ force: true });
+        await expect(providerCommunity).toBeChecked();
+        break;
+      }
       default:
         assertNever(key);
     }
   }
 
+  const pafUsdHourField = page.getByTestId("paf_usd_hour");
+  await expect(pafUsdHourField).toHaveAttribute("readonly", "");
+
+  const pafUsdHourValue = await pafUsdHourField.inputValue();
+  expect(pafUsdHourValue).toMatch(/^\d+(\.\d{1,2})?$/);
+  expect(Number(pafUsdHourValue)).toBeGreaterThan(0);
+
   for (let i = 0; i < locnetModel.locations.length; i++) {
     const networkElement = locnetModel.locations[i];
     await page.getByTestId("add_network_location").click();
-    if (networkElement.name) {
-      await page.getByTestId(`location-${i}-name`).fill(networkElement.name);
+    if (networkElement.location_name) {
+      await page
+        .getByTestId(`location-${i}-name`)
+        .fill(networkElement.location_name);
     }
 
     for (let y = 0; y < networkElement.networkTypes.length; y++) {

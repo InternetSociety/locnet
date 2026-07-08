@@ -1,1 +1,1 @@
-{"root":["./types.d.ts","./tests/example.spec.ts"],"errors":true,"version":"5.9.3"}
+{"root":["./tests/locnet.spec.ts","./tests/technologies.spec.ts","./tests/typescript.ts"],"errors":true,"version":"5.9.3"}

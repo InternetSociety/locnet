@@ -17,7 +17,7 @@
 
 ## Technologies in use
 ### Backend
-- FastAPI (Python) for the web API and server‑rendered endpoints
+- FastAPI (Python) for the web API and server-rendered endpoints
 - Pydantic v2 for request/response models and validation
 - Pandas for data handling and tabular computations
 - numpy‑financial for financial calculations
@@ -97,6 +97,29 @@ Production docs and quick start
 ## API usage
 - The application exposes a JSON API used by the SPA and available for direct integration.
 - OpenAPI/Swagger UI is available at `/docs` when the server is running, including schema and example requests.
+
+## Playwright tests
+Playwright is a browser automation and end-to-end testing framework for web applications. It is useful for checking that the app behaves correctly in real browsers, with real user actions such as clicking, typing, selecting options, and waiting for UI updates. The official documentation is here: [Playwright docs](https://playwright.dev/).
+
+This repository keeps its Playwright tests in the separate `playwright/` package. The current tests are:
+- `playwright/tests/locnet.spec.ts`
+  - Verifies that the app loads and the page title contains `Community Network Builder`.
+  - Loads sample builder data into the browser, fills out a representative network configuration, clicks `Calculate network`, and checks that the report section appears.
+- `playwright/tests/technologies.spec.ts`
+  - Opens the app, selects a country, and verifies that the `Introduction` section is visible after the page updates.
+
+Run the tests from the `playwright/` directory:
+```bash
+cd playwright
+npm install
+npm run test:playwright
+npm run test:playwright:ui
+```
+
+
+
+The Playwright config uses `http://localhost:8000` as its base URL, so the application server should be running before you start the browser tests.
+
 
 ## Contributing
 - Issues and pull requests are welcome. Please discuss major changes via an issue before submitting a PR.
