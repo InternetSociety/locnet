@@ -18,9 +18,9 @@ from library.bpo import (get_pl_lab_cos_by_year,
                          get_cf_cash_in_by_year, get_cf_cash_out_by_year,
                          get_cf_net_by_year, get_cf_cum_by_year,
                          build_inv_row)
-from library.supply import assign_users, apply_cpe_costs, solar_model
+from library.supply import assign_users, apply_cpe_costs, power_model
 from library.display import get_net_summary_table, get_dc_points, get_dcba_table
-from library.classes import BuilderInput, ModelerOutput, SolarModelInput
+from library.classes import BuilderInput, ModelerOutput, PowerModelInput
 from math import pi, log10, ceil, sqrt
 
 
@@ -52,6 +52,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     data_rows = []
     midhaul_rows = []
     backhaul_rows = []
+    power_rows = []
     tower_costs = []
     tech_use = []  # A list that will store all technology types in use
     paf_facilities = 0
@@ -109,7 +110,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     logging.info(f"demand for paf seats is {round(paf_seat_demand_seats)}")
     logging.info(f"use pp is {paf_use_pp} and users per seat is {round(paf_users_per_seat)}")
 
-    # Get model power variable inputs for passing through to the solar model:
+    # Get model power variable inputs for passing through to the power model:
     solar_cost_watt = input_data.solar_cost_watt
     solar_derating = input_data.solar_derating
     solar_efficiency = input_data.solar_efficiency
@@ -388,11 +389,11 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         # For each location process power system required
         logging.info(f"Location {location} has a power system of {location.power_type} consumption of {location_watts}")
 
-        # Solar Model setup
-        # region Solar Model
-        # Create a SolarModelInput instance with all the needed parameters
-        logging.info(f'Creating SolarModelInput and logging')
-        solar_model_input = SolarModelInput(
+        # Power Model setup
+        # region Power Model
+        logging.info("Creating PowerModelInput and logging")
+        power_model_input = PowerModelInput(
+            location=location,
             latitude=latitude,
             longitude=longitude,
             power_required=location_watts,
@@ -412,15 +413,17 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
             power_reliable_hours=power_reliable_hours,
             system_type=location.power_type
         )
-        # Then call the solar_model with the input object
-        solar_results = solar_model(input_data=solar_model_input)
-        location_power_capex = round(float(solar_results["power_capex"]), 2)
+        power_results = power_model(input_data=power_model_input)
+        power_rows.append(power_results.power_row.model_dump())
+        location_power_capex = power_results.power_capex
         power_capex += location_power_capex
-        location_power_opex = round(float(solar_results["power_opex"]), 2)
+        location_power_opex = power_results.power_opex
         power_opex += location_power_opex
         # endregion
 
     # Summarise Power CapEx and OpEx across all locations
+    power_capex = round(power_capex, 2)
+    power_opex = round(power_opex, 2)
     logging.info(f"Power CapEx is {power_capex} and OpEx is {power_opex}")
 
     # Deduplicate the tech_use list
@@ -438,12 +441,48 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         columns=["network_link_speed", "network_link_cost", "network_link_watts"])
     # bdf is the backhaul data frame
     bdf = pd.DataFrame(backhaul_rows)
+    # podf is the per location power data frame
+    podf = pd.DataFrame(power_rows)
 
     # Logging the created data frames to check what they're producing
     logging.info(f'Data table (df): \n{ldf.to_string(index=False)}')
     if not mdf.empty:
         logging.info(f'Midhaul link data table (mdf): \n{mdf.to_string(index=False)}')
     logging.info(f'Backhaul link data table (bdf): \n{bdf.to_string(index=False)}')
+    if not podf.empty:
+        logging.info(f'Power sizing table (podf): \n{podf.to_string(index=False)}')
+
+    bom_table_columns = [
+        {"title": "Location", "data": "location_name"},
+        {"title": "Power Required (W)", "data": "power_required"},
+        {"title": "Mains Installation Cost", "data": "mains_power_installation_cost"},
+        {"title": "Charger Cost", "data": "charger_cost"},
+        {"title": "Battery Required (Wh)", "data": "battery_required"},
+        {"title": "Battery Cost", "data": "battery_cost"},
+        {"title": "Solar Panels Required (m2)", "data": "panels_need_m2"},
+        {"title": "Solar Cost", "data": "solar_cost"},
+        {"title": "Power CapEx", "data": "power_capex"},
+    ]
+    if not podf.empty:
+        bom_table_rows = (
+            podf[
+                [
+                    "location_name",
+                    "power_required",
+                    "mains_power_installation_cost",
+                    "charger_cost",
+                    "battery_required",
+                    "battery_cost",
+                    "panels_need_m2",
+                    "solar_cost",
+                    "power_capex",
+                ]
+            ]
+            .replace({np.nan: None})
+            .to_dict(orient="records")
+        )
+    else:
+        bom_table_rows = []
 
     # Assign users to technologies
     ldf = assign_users(ldf, total_potential_users_all_types)
@@ -2156,7 +2195,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         "power_hybrid_hours": power_hybrid_hours,
         "power_intermittent_hours": power_intermittent_hours,
         "power_reliable_hours": power_reliable_hours,
-        "power_opex": power_opex,
+        "power_opex": int(round(power_opex)),
         "power_required": total_power_required,
         "solar_cost_watt": solar_cost_watt,
         "solar_derating": solar_derating,
@@ -2182,6 +2221,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         "outcomes_table_columns": outcomes_table_columns,
         "outcomes_table_rows": outcomes_table_rows,
         "detailed_results": ldf.to_dict(orient='records'),
+        "bom_table_columns": bom_table_columns,
+        "bom_table_rows": bom_table_rows,
         "net_summary_table_columns": net_summary_table_columns,
         "net_summary_table_rows": net_summary_table_rows
     }

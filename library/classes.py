@@ -242,7 +242,7 @@ class ModelerOutput(BaseModel):
     power_intermittent_hours: Optional[int] = None
     power_hybrid_hours: Optional[int] = None
     power_reliable_hours: Optional[int] = None
-    power_opex: int
+    power_opex: float
     power_required: int
     solar_cost_watt: Optional[float] = None
     solar_derating: Optional[float] = None
@@ -271,6 +271,8 @@ class ModelerOutput(BaseModel):
     outcomes_table_columns: Optional[List[Dict[str, str]]] = None
     net_summary_table_rows: Optional[List[Dict[str, Any]]] = None
     net_summary_table_columns: Optional[List[Dict[str, str]]] = None
+    bom_table_rows: Optional[List[Dict[str, Any]]] = None
+    bom_table_columns: Optional[List[Dict[str, str]]] = None
 
 class ModelerAPIOutput(BaseModel):
     detailed_results: List[Dict[str, Any]]
@@ -285,43 +287,68 @@ class ModelerAPIOutput(BaseModel):
     outcomes_table_columns: Optional[List[Dict[str, str]]] = None
     net_summary_table_rows: Optional[List[Dict[str, Any]]] = None
     net_summary_table_columns: Optional[List[Dict[str, str]]] = None
+    bom_table_rows: Optional[List[Dict[str, Any]]] = None
+    bom_table_columns: Optional[List[Dict[str, str]]] = None
 
-# Solar Model Input
-class SolarModelInput:
-    def __init__(self,
-                 battery_age_derating: float,
-                 battery_cost_watt_hour: float,
-                 battery_dod: float,
-                 charger_inverter_base: float,
-                 charger_inverter_variable: float,
-                 latitude: float,
-                 longitude: float,
-                 mains_power_installation_cost: float,
-                 mains_power_cost_kwh: float,
-                 power_hybrid_hours: float,
-                 power_intermittent_hours: float,
-                 power_reliable_hours: float,
-                 power_required: int,
-                 system_life: int,
-                 system_type: str,
-                 solar_cost_watt: float,
-                 solar_derating: float,
-                 solar_efficiency: int):
-        self.battery_age_derating = battery_age_derating
-        self.battery_cost_watt_hour = battery_cost_watt_hour
-        self.battery_dod = battery_dod
-        self.charger_inverter_base = charger_inverter_base
-        self.charger_inverter_variable = charger_inverter_variable
-        self.latitude = latitude
-        self.longitude = longitude
-        self.mains_power_installation_cost = mains_power_installation_cost
-        self.mains_power_cost_kwh = mains_power_cost_kwh
-        self.power_hybrid_hours = power_hybrid_hours
-        self.power_intermittent_hours = power_intermittent_hours
-        self.power_reliable_hours = power_reliable_hours
-        self.power_required = power_required
-        self.system_life = system_life
-        self.system_type = system_type
-        self.solar_cost_watt = solar_cost_watt
-        self.solar_derating = solar_derating
-        self.solar_efficiency = solar_efficiency
+# Power Model Input
+class PowerModelInput(BaseModel):
+    location: LocationData
+    latitude: float
+    longitude: float
+    power_required: float
+    system_life: int
+    solar_cost_watt: float
+    solar_derating: float
+    solar_efficiency: int
+    battery_age_derating: float
+    battery_cost_watt_hour: float
+    battery_dod: float
+    charger_inverter_base: float
+    charger_inverter_variable: float
+    mains_power_cost_kwh: float
+    mains_power_installation_cost: float
+    power_hybrid_hours: float
+    power_intermittent_hours: float
+    power_reliable_hours: float
+    system_type: str
+
+
+class PowerModelRow(BaseModel):
+    location_name: str
+    system_type: str
+    latitude: float
+    longitude: float
+    power_required: float
+    system_life: int
+    solar_cost_watt: float
+    solar_derating: float
+    solar_efficiency: int
+    battery_age_derating: float
+    battery_cost_watt_hour: float
+    battery_dod: float
+    charger_inverter_base: float
+    charger_inverter_variable: float
+    mains_power_cost_kwh: float
+    mains_power_installation_cost: float
+    power_hybrid_hours: float
+    power_intermittent_hours: float
+    power_reliable_hours: float
+    min_daily_sun_wm2: float
+    max_no_sun_days: float
+    annual_no_sun_days: float
+    min_temp_c: float
+    adjusted_hours: float
+    battery_required: float
+    battery_cost: float
+    charger_cost: float
+    power_opex: float
+    watts_day_m2: Optional[float] = None
+    panels_need_m2: Optional[float] = None
+    solar_cost: float = 0
+    power_capex: float
+
+
+class PowerModelResult(BaseModel):
+    power_capex: float
+    power_opex: float
+    power_row: PowerModelRow
