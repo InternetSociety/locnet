@@ -79,13 +79,15 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     bus_users = int(businesses * bus_users_avg) if bus_users_avg is not None else 0
     if bus_users == 0:
         businesses = 0
-    # Get the total potential users
-    potential_household_users = input_data.total_potential_users
-    total_potential_users_all_types = int(potential_household_users + sp_users + bus_users)
+
+    total_potential_users_all_types = input_data.total_potential_users
+    # Get the total potential users and reduce them by service provider and business users
+    # This means we don't double-count members of the community getting service from their employer
+    potential_household_users = total_potential_users_all_types - sp_users - bus_users
+
     labour_cost = input_data.labour_cost
     labour_monthly = labour_cost * 40 * 4.3
     terrain_type = input_data.terrain_type
-    # default_tower_cost = input_data.tower_cost  # Defaults to 10,000 in the model in case it is not submitted
     households = int(input_data.households_total) if input_data.households_total is not None else 0  # Household Decision Makers
     pop_growth_rate_input = input_data.pop_growth_rate if input_data.pop_growth_rate is not None else 0
     pop_growth_rate = pop_growth_rate_input / 100  # User Interface C11
@@ -196,12 +198,13 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
             # Determine the population covered, users and households supported
             if tech["technology"] == "PAF":
-                paf_seats = sectors
+                loc_paf_seats = sectors
+                paf_seats += loc_paf_seats
                 pop_covered = potential_household_users
                 users_sector = paf_hours_month_seat / paf_use_pp
                 users_supported = users_sector * sectors
                 # Re-set downlink mbps to reflect peak hour demand in final year times number of seats
-                downlink_mbps = round((user_final_year_peak_mbps * paf_seats),2)
+                downlink_mbps = round((user_final_year_peak_mbps * loc_paf_seats),2)
             else:
                 pop_covered_per_sector = min((population_density * sector_coverage), total_potential_users_all_types)
                 pop_covered = min(pop_covered_per_sector * sectors, total_potential_users_all_types)
@@ -485,8 +488,10 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         bom_table_rows = []
 
     # Assign users to technologies
+    logging.info("Assigning users to technologies...")
     ldf = assign_users(ldf, total_potential_users_all_types)
 
+    logging.info("Assigning UE costs to the build")
     # Assign UE costs to the build
     ldf = apply_cpe_costs(ldf)
 
@@ -497,13 +502,21 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     total_coverage_area = float(ldf.groupby('location_name')['coverage_area'].max().sum())
     total_population_covered = int(ldf.groupby('location_name')['population_covered'].max().sum().round())
 
-    solution_supported_users = int(ldf['users_supported'].sum().round())
+    logging.info(f"PAF seats supported by the solution: {paf_seats}")
+    paf_mask = ldf['network_type'].eq('Public Access Facility')
+    cn_supported_users = int(ldf.loc[~paf_mask, 'users_supported'].sum().round())
+    paf_supported_users = int(ldf.loc[paf_mask, 'users_supported'].sum().round())
+    solution_supported_users = cn_supported_users + paf_supported_users
     if solution_supported_users < 1:
         raise ValueError("The supplied network configuration does not cover any users")
-    logging.info(f"The solution supports {solution_supported_users} users across {len(ldf)} locations.")
+    logging.info(
+        f"The solution supports {solution_supported_users} users across {len(ldf)} locations "
+        f"({cn_supported_users} Community Network, {paf_supported_users} PAF)."
+    )
     # Ensure total users supported doesn't exceed coverage or total potential users
     solution_supported_users = min(solution_supported_users, total_population_covered, total_potential_users_all_types)
-    backhaul_required = int(round(user_final_year_peak_mbps * solution_supported_users))
+    # PAF users are not relevant for backhaul calcs, only the number of seats in use.
+    backhaul_required = int(round(user_final_year_peak_mbps * (cn_supported_users + paf_seats)))
 
     # Find the total power required by all access, midhaul, and backhaul equipment
     total_power_required = int((
@@ -635,10 +648,6 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # Variable Assignments
     # region CBA Variables
-    # Households above median
-    hha = households / 2
-    # Households below median
-    hhb = households / 2
     # Imports from the User Interface
     # Calculate CapEx Subsidy as a percentage of total build cost
     capex_cash_subsidy = input_data.capex_subsidy
@@ -690,15 +699,15 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         seats_users_ratio = paf_seats / potential_household_users
         logging.info(f"Seats to Users Ratio: {seats_users_ratio}")
 
-        # Percentage of non-subscribers who use PAF (B50)
+        # Percentage of non-subscribers who might use PAF (B50)
         paf_non_sub_pct = min(-0.097 * seats_users_ratio ** 3 + 1.6 * seats_users_ratio ** 2 - 0.6 * seats_users_ratio + 0.45, 0.70)
         logging.info(f"Pct of non-subscribers using paf: {paf_non_sub_pct}")
 
-        # Percent of subscribers who use PAF (B49)
+        # Percent of subscribers who might use PAF (B49)
         paf_sub_pct = paf_non_sub_pct / 2
         logging.info(f"Pct of subscribers using paf: {paf_sub_pct}")
 
-        # Percentage of Deterred users who use PAF (B51)
+        # Percentage of Deterred users who might use PAF (B51)
         paf_deterred_pct = min(paf_non_sub_pct * 2, 1.00)
         logging.info(f"Pct of deterred using paf: {paf_deterred_pct}")
 
@@ -751,16 +760,19 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # Priority 1: Service Provider Users
     # sp_users are first in line. We take the minimum of total supported or total SP users.
-    supported_sp_users = min(solution_supported_users, sp_users)
+    logging.info(f"The network solution excluding PAF supports {cn_supported_users} users")
+    supported_sp_users = min(cn_supported_users, sp_users)
     # logging.info(f"Supported Service Provider Users is {supported_sp_users}")
     if supported_sp_users == 0:
         supported_service_providers = 0
     else:
         supported_service_providers = math.floor(supported_sp_users/sp_users_avg)
-    # logging.info(f"Adjusted Service Providers is {supported_service_providers}")
+    sp_users = supported_sp_users
+    # logging.info(f"Adjusted Supported Service Providers is {supported_service_providers}")
+    logging.info(f"Adjusted Service Provider users is {sp_users}")
 
     # Remaining capacity for Business and Household users
-    remaining_capacity = solution_supported_users - supported_sp_users
+    remaining_capacity = cn_supported_users - supported_sp_users
     # logging.info(f"Remaining Capacity after assigning Service Provider Users is {remaining_capacity}")
 
     # Priority 2: Business Users
@@ -778,10 +790,16 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         logging.info("No capacity was left or no users were available, zeroing out household and business users ")
         supported_bus_users = 0
         supported_household_users = 0
+    bus_users = supported_bus_users
 
-    supported_households = math.floor(supported_household_users/hh_size)
     # Divide supported_household_users by users per household to get
-    logging.info(f"Adjusted household decision makers is {supported_households}")
+    supported_households = math.floor(supported_household_users/hh_size)
+    logging.info(f"Adjusted household decision makers is {hdm}")
+    hdm = supported_households
+    # Households above median
+    hha = supported_households / 2
+    # Households below median
+    hhb = supported_households / 2
 
     # Divide supported_bus_users by number of businesses to get bdm
     if supported_bus_users == 0:
@@ -829,8 +847,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # Number of users for the CBA model nu (Demand Modelling C14-C20)
     # region CBA NU
-    cba_nu_sp = service_providers * sp_users  # Demand Modelling C14
-    cba_nu_bus = supported_bus_users  # Demand Modelling C15
+    cba_nu_sp = sp_users  # Demand Modelling C14
+    cba_nu_bus = bus_users  # Demand Modelling C15
     cba_nu_hha = cba_ndm_hha * hh_size  # Demand Modelling C16
     cba_nu_hhb = cba_ndm_hhb * hh_size  # Demand Modelling C17
     cba_nu_sub = cba_nu_sp + cba_nu_bus + cba_nu_hha + cba_nu_hhb  # Demand Modelling C18
@@ -1007,6 +1025,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # logging.info(f'CBA Penetration Rate SP Complete')
 
     # Households Above Median Penetration cba_pen_hha (Demand Modelling I16)
+    # Business Penetration cba_pen_bus (Demand Modelling I15)
     # Includes cost as a proportion of income, a crowding factor for PFAS, and demand curve parameters
     # =IF('User interface'!C64="Yes",0,MIN(EXP((H16/('User interface'!C10*4*1.5*IF(users_public_facility=0,1,MAX(EXP(-0.004*users_public_facility),0.7)))-B$27)/(-B$28)),0.95))
 
@@ -1020,40 +1039,44 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     if paf_only:
         cba_pen_hha = 0
-        # logging.info("PAF only connectivity: setting cba_pen_hha = 0")
+        cba_pen_bus = 0
+        # logging.info("PAF only connectivity: setting cba_pen_hha and cba_bus_hha = 0")
     else:
         if paf_seats == 0:
             crowding_factor = 1
         else:
             crowding_factor = max(math.exp(-0.004 * paf_seats), 0.7)
 
-        # logging.info(f"Crowding factor hha: {crowding_factor}")
+        # logging.info(f"Crowding factor: {crowding_factor}")
 
         affordability_denom = hh_income_week * 4 * 1.5 * crowding_factor
         # logging.info(f"Affordability denominator: {affordability_denom}")
 
-        adoption_score = (cba_moec_hha / affordability_denom - dc_parameter_a) / -dc_parameter_b
-        # logging.info(f"Adoption score (raw): {adoption_score}")
+        hha_adoption_score = (cba_moec_hha / affordability_denom - dc_parameter_a) / -dc_parameter_b
+        # logging.info(f"Adoption score hha (raw): {hha_adoption_score}")
+
+        bus_adoption_score = (cba_moec_bus / affordability_denom - dc_parameter_a) / -dc_parameter_b
+        # logging.info(f"Adoption score Business (raw): {bus_adoption_score}")
 
         # Avoid math range errors
         MAX_EXP_INPUT = 700
-        safe_score = min(adoption_score, MAX_EXP_INPUT)
-        # logging.info(f"Adoption score (capped to safe max): {safe_score}")
+        hha_safe_score = min(hha_adoption_score, MAX_EXP_INPUT)
+        bus_safe_score = min(bus_adoption_score, MAX_EXP_INPUT)
+        # logging.info(f"Adoption score (capped to safe max): {hha_safe_score}")
+        # logging.info(f"Adoption score (capped to safe max): {bus_safe_score}")
 
-        exp_result = math.exp(safe_score)
-        # logging.info(f"exp(adoption_score): {exp_result}")
+        hha_exp_result = math.exp(hha_safe_score)
+        # logging.info(f"exp(adoption_score): {hha_exp_result}")
+        bus_exp_result = math.exp(bus_safe_score)
+        # logging.info(f"exp(adoption_score): {bus_exp_result}")
 
-        cba_pen_hha = min(exp_result, 0.95)
+        cba_pen_hha = min(hha_exp_result, 0.95)
         # logging.info(f"Final cba_pen_hha: {cba_pen_hha}")
-    # logging.info(f'CBA Penetration Rate HHA Complete')
+        cba_pen_bus = min(bus_exp_result, 0.95)
+        # logging.info(f"Final cba_pen_bus: {cba_pen_bus}")
 
-    # Business Penetration cba_pen_bus (Demand Modelling I15)
-    # Mirrors Households above Median penetration unless PAF is the only option
-    if paf_only:
-        cba_pen_bus = 0
-    else:
-        cba_pen_bus = cba_pen_hha
-    # logging.info(f'CBA Penetration Rate Bus Complete')
+
+    # logging.info(f'CBA Penetration Rate hha and Bus Complete')
 
     # Households Below Median Penetration cba_pen_hhb (Demand Modelling I17)
     # Includes cost as a proportion of income, a crowding factor for PFAS, and demand curve parameters
@@ -1182,63 +1205,71 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # Additional PAF calculations
     # region ADDITIONAL PAF
 
+    community_network_available = (not paf_only) and cn_supported_users > 0
+
     # Reduced Contracted Users (paf_deterred) (B43)
-    if paf_only:
-        paf_deterred_users = 0
-    else:
+    if community_network_available:
         base_demand = hha * cba_pen_hha + hhb * cba_pen_hhb
         adjusted_demand = hha * cvac_hha_pen + hhb * cvac_hhb_pen
-        paf_deterred_users = base_demand - adjusted_demand
+        paf_deterred_users = max(base_demand - adjusted_demand, 0)
+    else:
+        paf_deterred_users = 0
 
     # Remaining Contracted Users (paf_sub_users) (B44)
     # Weighted sum of adoption probabilities * number of users in each group
-    paf_sub_users = hha * cvac_hha_pen + hhb * cvac_hhb_pen
+    paf_sub_users = hha * cvac_hha_pen + hhb * cvac_hhb_pen if community_network_available else 0
 
     # Non Contracted persons (paf_non_sub_users) (B45)
     # The overall number of users minus Deterred and Contracted Users
-    paf_non_sub_users = potential_household_users - paf_deterred_users - paf_sub_users
+    paf_non_sub_users = max(potential_household_users - paf_deterred_users - paf_sub_users, 0)
 
-    # PAF Non Contracted Users (paf_noncon_users) (B48)
+    # PAF monthly capacity hours (B61)
+    paf_monthly_capacity = paf_seats * paf_hours_month_seat
+
+    deterred_hours_per_user = paf_deterred_pct * paf_deterred_use
+    sub_hours_per_user = paf_sub_pct * paf_sub_use
+    non_sub_hours_per_user = paf_non_sub_pct * paf_non_sub_use
+
+    requested_paf_monthly_use = (
+        paf_deterred_users * deterred_hours_per_user +
+        paf_sub_users * sub_hours_per_user +
+        paf_non_sub_users * non_sub_hours_per_user
+    )
+
+    if requested_paf_monthly_use > 0 and paf_monthly_capacity >= 0:
+        paf_capacity_scale = min(paf_monthly_capacity / requested_paf_monthly_use, 1)
+    else:
+        paf_capacity_scale = 0 if paf_monthly_capacity <= 0 else 1
+
+    paf_deterred_users *= paf_capacity_scale
+    paf_sub_users *= paf_capacity_scale
+    paf_non_sub_users *= paf_capacity_scale
+
+    # PAF Non Contracted Users (B48)
     paf_noncon_users = paf_non_sub_users * paf_non_sub_pct + paf_deterred_users
     logging.info(f"Actual users of the PAF {paf_noncon_users}")
 
     # PAF use in Hours Subscribers (Subscriber Use) (B56)
-    paf_sub_hours = paf_sub_pct * paf_sub_users * paf_sub_use
+    paf_sub_hours = paf_sub_users * sub_hours_per_user
 
     # PAF use in Hours Non-Subscribers (Non Subscriber Use) (B57)
-    paf_non_sub_hours = paf_non_sub_pct * paf_non_sub_users * paf_non_sub_use
+    paf_non_sub_hours = paf_non_sub_users * non_sub_hours_per_user
 
     # PAF use in Hours Deferred Users (Deferred User Use) (B58)
-    paf_deterred_hours = paf_deterred_pct * paf_deterred_users * paf_deterred_use
+    paf_deterred_hours = paf_deterred_users * deterred_hours_per_user
 
     # PAF use per month (B59)
     paf_monthly_use = paf_sub_hours + paf_non_sub_hours + paf_deterred_hours
 
-    # PAF monthly capacity hours (B61)
-    # Supply model considers 50% loading, demand model considers 100% availability
-    paf_monthly_capacity = paf_seats * paf_hours_month_seat * 2
-
     # Congestion Rate (B62)
     paf_congest_rate = False
-    if paf_present:
+    if paf_present and paf_monthly_capacity > 0:
         paf_congest_rate = paf_monthly_use / paf_monthly_capacity
 
     # PAF Annual Revenue (B46)
-    paf_revenue = ((paf_deterred_users * paf_deterred_use
-                    + paf_sub_users * paf_sub_pct * paf_sub_use
-                    + paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use)
-                   * paf_usd_hour * 12
-                   )
+    paf_revenue = paf_hours_month_seat * paf_seats * paf_usd_hour * 12
     # PAF Margin compared to Internet Provider (B47)
     paf_margin = 0.5
-
-    # PAF Annual Revenue (B46)
-
-    paf_revenue = ((paf_deterred_users * paf_deterred_use
-                    + paf_sub_users * paf_sub_pct * paf_sub_use
-                    + paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use)
-                   * paf_usd_hour * 12
-                   )
 
     if paf_only:
         cba_mcec_paf = o36 / 12  # full annual connectivity capex divided monthly
@@ -1252,6 +1283,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # region Additional PAF
     # PAF MOEC (F19)
+    logging.info("Entering PAF MOEC")
     if paf_only:
         cba_moec_paf = cba_mcec_paf * 0.2
     else:
@@ -1333,7 +1365,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # logging.info(f"monthly_payment: {monthly_payment}")
     # logging.info(f"cba_omsdm_hhb: {cba_omsdm_hhb}")
 
-    # Other monthly cost per Household Decision Maker Subtotal cba_omsdm_sub (Demand Modelling G18)
+    # Other monthly cost per Service Provider Decision Maker Subtotal cba_omsdm_sub (Demand Modelling G18)
     # Weighted average of monthly mobile device costs across all decision maker groups
     if cba_ndm_sp == 0:
         cba_omsdm_sub = 0
@@ -1345,12 +1377,14 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
                 cba_omsdm_hhb * hhb
         )
         cba_omsdm_sub = total_weighted_cost / ndm
+    logging.info(f"cba_omsdm_sub: {cba_omsdm_sub}")
 
     # Other monthly cost per PAF decision maker cba_omsdm_sub (Demand Modelling G19)
 
     total_equipment_cost = paf_seats * paf_seat_cost
     annual_payment = npf.pmt(wacc, system_life, -total_equipment_cost)
     cba_omsdm_paf = annual_payment / 12
+    logging.info(f"cba_omsdm_paf: {cba_omsdm_paf}")
 
     # endregion
 
@@ -1418,17 +1452,24 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
 
         # W28, W29: Area/cost ratio
-        cvac_hha_ratio = cvac_hha_area / cvac_hha_cost
-        cvac_hhb_ratio = cvac_hhb_area / cvac_hhb_cost
+
+        if cba_pen_hha == 0:
+            cvac_hha_ratio = 0
+        else:
+            cvac_hha_ratio = cvac_hha_area / cvac_hha_cost
+        if cba_pen_hhb == 0:
+            cvac_hhb_ratio = 0
+        else:
+            cvac_hhb_ratio = cvac_hhb_area / cvac_hhb_cost
         # logging.info(f'W28: {cvac_hha_ratio}')
         # logging.info(f'W29: {cvac_hhb_ratio}')
 
-        # X26–X29: Penetration inputs
-        cvac_a_pen = 1
-        cvac_hha_pen = min(math.exp((cba_moec_hha / (hh_income_week * 4 * 1.5) - dc_parameter_a) / -dc_parameter_b),
-                           0.95)  # X28
-        cvac_hhb_pen = min(math.exp((cba_moec_hhb / (hh_income_week * 4 * 0.75) - dc_parameter_a) / -dc_parameter_b),
-                           0.95)  # x29
+        # # X26–X29: Penetration inputs unused by current version of the application
+        # cvac_a_pen = 1
+        # cvac_hha_pen = min(math.exp((cba_moec_hha / (hh_income_week * 4 * 1.5) - dc_parameter_a) / -dc_parameter_b),
+        #                    0.95)  # X28
+        # cvac_hhb_pen = min(math.exp((cba_moec_hhb / (hh_income_week * 4 * 0.75) - dc_parameter_a) / -dc_parameter_b),
+        #                    0.95)  # x29
 
 
     # endregion
@@ -1447,17 +1488,22 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # logging.info(f"paf_usd_hour: {paf_usd_hour}")
 
     # Log intermediate calculations
-    # deterred_component = paf_deterred_users * paf_deterred_use
-    # logging.info(f"deterred_component (paf_deterred_users * paf_deterred_use): {deterred_component}")
+    logging.info(f"community_network_available: {community_network_available}")
+    logging.info(f"requested_paf_monthly_use: {requested_paf_monthly_use}")
+    logging.info(f"paf_monthly_capacity: {paf_monthly_capacity}")
+    logging.info(f"paf_capacity_scale: {paf_capacity_scale}")
 
-    # sub_component = paf_sub_users * paf_sub_pct * paf_sub_use
-    # logging.info(f"sub_component (paf_sub_users * paf_sub_pct * paf_sub_use): {sub_component}")
+    deterred_component = paf_deterred_hours
+    # logging.info(f"deterred_component (paf_deterred_hours): {deterred_component}")
 
-    # non_sub_component = paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use
-    # logging.info(f"non_sub_component (paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use): {non_sub_component}")
+    sub_component = paf_sub_hours
+    # logging.info(f"sub_component (paf_sub_hours): {sub_component}")
 
-    # sum_component = deterred_component + sub_component + non_sub_component
-    # logging.info(f"sum_component: {sum_component}")
+    non_sub_component = paf_non_sub_hours
+    # logging.info(f"non_sub_component (paf_non_sub_hours): {non_sub_component}")
+
+    sum_component = paf_monthly_use
+    # logging.info(f"sum_component (paf_monthly_use): {sum_component}")
 
     # Log final calculation
     # logging.info(f"paf_revenue B46: {paf_revenue}")
@@ -1624,13 +1670,18 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # User Demand cba_dem (was Number of actual users) (Demand Modelling J14-J20)
     # region CBA DEM
-    cba_dem_sp = cba_nu_sp * cba_pen_sp
-    cba_dem_bus = cba_nu_bus * cba_pen_bus
-    cba_dem_hha = cba_nu_hha * cba_pen_hha
-    cba_dem_hhb = cba_nu_hhb * cba_pen_hhb
+    cba_dem_sp = round(cba_nu_sp * cba_pen_sp)
+    cba_dem_bus = round(cba_nu_bus * cba_pen_bus)
+    cba_dem_hha = round(cba_nu_hha * cba_pen_hha)
+    cba_dem_hhb = round(cba_nu_hhb * cba_pen_hhb)
+
+    logging.info(f"cba_dem_sp = {cba_dem_sp}")
+    logging.info(f"cba_dem_bus = {cba_dem_bus}")
+    logging.info(f"cba_dem_hha = {cba_dem_hha}")
+    logging.info(f"cba_dem_hhb = {cba_dem_hhb}")
 
     cba_dem_hh = round(cba_dem_hha + cba_dem_hhb)
-    cba_dem_sub = cba_dem_sp + cba_dem_bus + cba_dem_hha + cba_dem_hhb
+    cba_dem_sub = round(cba_dem_sp + cba_dem_bus + cba_dem_hha + cba_dem_hhb)
     cba_dem_paf = round(paf_noncon_users)
     cba_dem_oo = round((cba_dem_sub + cba_dem_paf))
     # endregion
@@ -1639,15 +1690,33 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # Traffic Demand in GB per Month (was GB per month demand (actual)) (Demand Modelling K14-K20)
     # region CBA DGBM
     # Demand weighted elasticity values for each
-    cba_dgbm_sp = cba_gbm_sp * cba_pen_sp
-    cba_dgbm_bus = cba_gbm_bus * cba_pen_bus
-    cba_dgbm_hha = cba_gbm_hha * cba_pen_hha
-    cba_dgbm_hhb = cba_gbm_hhb * cba_pen_hhb
+
+    if cba_dem_sp > 0:
+        cba_dgbm_sp = cba_gbm_sp * cba_pen_sp
+    else:
+        cba_dgbm_sp = 0
+
+    if cba_dem_bus > 0:
+        cba_dgbm_bus = cba_gbm_bus * cba_pen_bus
+    else:
+        cba_dgbm_bus = 0
+
+    if cba_dem_hha > 0:
+        cba_dgbm_hha = cba_gbm_hha * cba_pen_hha
+    else:
+        cba_dgbm_hha = 0
+
+    if cba_dem_hhb > 0:
+        cba_dgbm_hhb = cba_gbm_hhb * cba_pen_hhb
+    else:
+        cba_dgbm_hhb = 0
+
     cba_dgbm_sub = cba_gbm_sub * cba_pen_sub
     cba_dgbm_paf = (
-            paf_deterred_users * paf_deterred_use * paf_gb_hour +
+            min((paf_deterred_users * paf_deterred_use * paf_gb_hour +
             paf_sub_users * paf_sub_pct * paf_sub_use * paf_gb_hour +
-            paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use * paf_gb_hour
+            paf_non_sub_users * paf_non_sub_pct * paf_non_sub_use * paf_gb_hour),
+                paf_hours_month_seat * paf_seats * paf_gb_hour)
     )
     cba_dgbm_oo = cba_dgbm_sub + cba_dgbm_paf
     # endregion
@@ -1655,28 +1724,28 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # Annual user payments to network provider (Demand Modelling L14-L20)
     # region CBA AUP
     # logging.info("=== CBA AUP debug start ===")
-    #
+
     # logging.info("L14 inputs for cba_aup_sp")
     # logging.info(f"cba_ndm_sp = {cba_ndm_sp}")
     # logging.info(f"cba_pen_sp = {cba_pen_sp}")
     # logging.info(f"cba_mcec_sp = {cba_mcec_sp}")
     # logging.info(f"cba_moec_sp = {cba_moec_sp}")
     # logging.info(f"(cba_mcec_sp + cba_moec_sp) = {cba_mcec_sp + cba_moec_sp}")
-    #
+
     # logging.info("L15 inputs for cba_aup_bus")
     # logging.info(f"cba_ndm_bus = {cba_ndm_bus}")
     # logging.info(f"cba_pen_bus = {cba_pen_bus}")
     # logging.info(f"cba_mcec_bus = {cba_mcec_bus}")
     # logging.info(f"cba_moec_bus = {cba_moec_bus}")
     # logging.info(f"(cba_mcec_bus + cba_moec_bus) = {cba_mcec_bus + cba_moec_bus}")
-    #
+
     # logging.info("L16 inputs for cba_aup_hha")
     # logging.info(f"cba_ndm_hha = {cba_ndm_hha}")
     # logging.info(f"cba_pen_hha = {cba_pen_hha}")
     # logging.info(f"cba_mcec_hha = {cba_mcec_hha}")
     # logging.info(f"cba_moec_hha = {cba_moec_hha}")
     # logging.info(f"(cba_mcec_hha + cba_moec_hha) = {cba_mcec_hha + cba_moec_hha}")
-    #
+
     # logging.info("L17 inputs for cba_aup_hhb")
     # logging.info(f"cba_ndm_hhb = {cba_ndm_hhb}")
     # logging.info(f"cba_pen_hhb = {cba_pen_hhb}")
@@ -1689,10 +1758,23 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # logging.info(f"paf_margin = {paf_margin}")
     #
     # logging.info("=== CBA AUP debug end ===")
-    cba_aup_sp = cba_ndm_sp * cba_pen_sp * (cba_mcec_sp + cba_moec_sp) * 12  # L14
-    cba_aup_bus = cba_ndm_bus * cba_pen_bus * (cba_mcec_bus + cba_moec_bus) * 12  # L15
-    cba_aup_hha = cba_ndm_hha * cba_pen_hha * (cba_mcec_hha + cba_moec_hha) * 12  # L16
-    cba_aup_hhb = cba_ndm_hhb * cba_pen_hhb * (cba_mcec_hhb + cba_moec_hhb) * 12  # L17
+
+    if cba_dem_sp > 0:
+        cba_aup_sp = cba_ndm_sp * cba_pen_sp * (cba_mcec_sp + cba_moec_sp) * 12  # L14
+    else:
+        cba_aup_sp = 0
+    if cba_dem_bus > 0:
+        cba_aup_bus = cba_ndm_bus * cba_pen_bus * (cba_mcec_bus + cba_moec_bus) * 12  # L15
+    else:
+        cba_aup_bus = 0
+    if cba_dem_hha > 0:
+        cba_aup_hha = cba_ndm_hha * cba_pen_hha * (cba_mcec_hha + cba_moec_hha) * 12  # L16
+    else:
+        cba_aup_hha = 0
+    if cba_dem_hhb > 0:
+        cba_aup_hhb = cba_ndm_hhb * cba_pen_hhb * (cba_mcec_hhb + cba_moec_hhb) * 12  # L17
+    else:
+        cba_aup_hhb = 0
 
     cba_aup_sub = cba_aup_sp + cba_aup_bus + cba_aup_hha + cba_aup_hhb  # L18
     cba_aup_paf = paf_revenue * paf_margin  # L19
@@ -1709,8 +1791,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         cba_sur_ratio_hhb = 0
         cba_sur_ratio_paf = 2.5
     else:
-        cba_sur_ratio_hha = cvac_hha_ratio
-        cba_sur_ratio_hhb = cvac_hhb_ratio
+        cba_sur_ratio_hha = max(cvac_hha_ratio, 0)
+        cba_sur_ratio_hhb = max(cvac_hhb_ratio, 0)
         cba_sur_ratio_sp = cba_sur_ratio_hha * 1.5
         cba_sur_ratio_bus = cba_sur_ratio_hha
         cba_sur_ratio_paf = 0 if cba_aup_paf == 0 else cba_sur_ratio_hhb
