@@ -73,17 +73,25 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     sp_users = int(service_providers * sp_users_avg) if sp_users_avg is not None else 0
     if sp_users == 0:
         service_providers = 0
+    logging.info(f"Service Provider Users is {sp_users}")
     # Get the number of businesses and their users from user input
     businesses = int(input_data.businesses) if input_data.businesses is not None else 0
     bus_users_avg = input_data.business_users
     bus_users = int(businesses * bus_users_avg) if bus_users_avg is not None else 0
     if bus_users == 0:
         businesses = 0
+    logging.info(f"Business Users is {bus_users}")
 
     total_potential_users_all_types = input_data.total_potential_users
     # Get the total potential users and reduce them by service provider and business users
     # This means we don't double-count members of the community getting service from their employer
     potential_household_users = total_potential_users_all_types - sp_users - bus_users
+    if potential_household_users <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="The submitted community cannot support the number of service providers and/or businesses entered."
+        )
+    logging.info(f"Potential Household Users is {potential_household_users}")
 
     labour_cost = input_data.labour_cost
     labour_monthly = labour_cost * 40 * 4.3
@@ -489,6 +497,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # Assign users to technologies
     logging.info("Assigning users to technologies...")
+    logging.info(f"Total potential users: {total_potential_users_all_types}")
     ldf = assign_users(ldf, total_potential_users_all_types)
 
     logging.info("Assigning UE costs to the build")
@@ -762,27 +771,27 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     # sp_users are first in line. We take the minimum of total supported or total SP users.
     logging.info(f"The network solution excluding PAF supports {cn_supported_users} users")
     supported_sp_users = min(cn_supported_users, sp_users)
-    # logging.info(f"Supported Service Provider Users is {supported_sp_users}")
+    logging.info(f"Supported Service Provider Users is {supported_sp_users}")
     if supported_sp_users == 0:
         supported_service_providers = 0
     else:
         supported_service_providers = math.floor(supported_sp_users/sp_users_avg)
     sp_users = supported_sp_users
-    # logging.info(f"Adjusted Supported Service Providers is {supported_service_providers}")
+    logging.info(f"Adjusted Supported Service Providers is {supported_service_providers}")
     logging.info(f"Adjusted Service Provider users is {sp_users}")
 
     # Remaining capacity for Business and Household users
     remaining_capacity = cn_supported_users - supported_sp_users
-    # logging.info(f"Remaining Capacity after assigning Service Provider Users is {remaining_capacity}")
+    logging.info(f"Remaining Capacity after assigning Service Provider Users is {remaining_capacity}")
 
     # Priority 2: Business Users
     # bus_users are second in line. We take the minimum of total supported or total BUS users.
 
     if remaining_capacity > 0 and (bus_users + potential_household_users) > 0:
         supported_bus_users = min(remaining_capacity,bus_users)
-        # logging.info(f"Supported Business Users is {supported_bus_users}")
-        remaining_capacity = solution_supported_users - supported_bus_users
-        # logging.info(f"Remaining Capacity after assigning Business Users is {remaining_capacity}")
+        logging.info(f"Supported Business Users is {supported_bus_users}")
+        remaining_capacity = remaining_capacity - supported_bus_users
+        logging.info(f"Remaining Capacity after assigning Business Users is {remaining_capacity}")
         supported_household_users = remaining_capacity
         # logging.info(f"Adjusted household users is {supported_household_users}")
 
@@ -793,13 +802,13 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     bus_users = supported_bus_users
 
     # Divide supported_household_users by users per household to get
-    supported_households = math.floor(supported_household_users/hh_size)
-    logging.info(f"Adjusted household decision makers is {hdm}")
+    supported_households = min(math.floor(supported_household_users/hh_size), households)
     hdm = supported_households
+    logging.info(f"Adjusted household decision makers is {hdm}")
     # Households above median
-    hha = supported_households / 2
+    hha = hdm // 2
     # Households below median
-    hhb = supported_households / 2
+    hhb = hha
 
     # Divide supported_bus_users by number of businesses to get bdm
     if supported_bus_users == 0:
@@ -840,8 +849,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     cba_ndm_oo = ndm  # Demand Modelling B20
     cba_ndm_sp = supported_service_providers  # Demand Modelling B14
     cba_ndm_bus = supported_businesses  # Demand Modelling B15
-    cba_ndm_hha = hdm / 2  # Demand Modelling B16
-    cba_ndm_hhb = hdm / 2  # Demand Modelling B17
+    cba_ndm_hha = hha  # Demand Modelling B16
+    cba_ndm_hhb = hhb  # Demand Modelling B17
     # endregion
     logging.info(f'CBA SP: {cba_ndm_sp}, BUS: {cba_ndm_bus}, HHA: {cba_ndm_hha}, HHB: {cba_ndm_hhb} ')
 
@@ -1453,11 +1462,11 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
         # W28, W29: Area/cost ratio
 
-        if cba_pen_hha == 0:
+        if cvac_hha_cost == 0:
             cvac_hha_ratio = 0
         else:
             cvac_hha_ratio = cvac_hha_area / cvac_hha_cost
-        if cba_pen_hhb == 0:
+        if cvac_hhb_cost == 0:
             cvac_hhb_ratio = 0
         else:
             cvac_hhb_ratio = cvac_hhb_area / cvac_hhb_cost

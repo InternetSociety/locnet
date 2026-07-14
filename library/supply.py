@@ -13,7 +13,7 @@ def assign_users(df, total_potential_users):
     # Sort by cost, then original order
     df = df.sort_values(["cost_per_passing", "_row_order"])
 
-    remaining = total_potential_users
+    remaining = int(round(total_potential_users))
 
     for cost, grp in df.groupby("cost_per_passing", sort=False):
         idx = grp.index
@@ -35,8 +35,8 @@ def assign_users(df, total_potential_users):
         # Sub-case A: equal capacities
         if np.all(capacities == capacities[0]):
             base = remaining // n
-            rem = remaining % n
-            alloc = np.full(n, base)
+            rem = int(remaining % n)
+            alloc = np.full(n, int(base))
             alloc[:rem] += 1
 
         # Sub-case B: proportional allocation
@@ -45,7 +45,7 @@ def assign_users(df, total_potential_users):
                 remaining * capacities / tier_capacity
             ).astype(int)
 
-            shortfall = remaining - alloc.sum()
+            shortfall = int(remaining - alloc.sum())
             if shortfall > 0:
                 alloc[:shortfall] += 1
 

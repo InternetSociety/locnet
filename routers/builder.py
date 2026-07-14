@@ -19,12 +19,14 @@ def modeler_logic(input_data: BuilderInput) -> ModelerOutput:
     try:
         # Call the builder function from helpers
         return modeler(input_data)
+    except HTTPException:
+        raise
     except ValueError as e:
         logging.error(f"{e}")
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logging.error(f"Error in modeler function: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logging.exception("Error in modeler function")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # POST endpoint for form submission and returning JSON
