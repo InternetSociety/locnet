@@ -2,6 +2,7 @@ import { Text } from '../form/Intl';
 import styles from './Header.module.css';
 import { IframeModalButton } from './IFrameModalButton';
 import { LanguagePicker } from './LanguagePicker';
+import { ModelFileControls } from '../locnet/ModelFileControls';
 
 export const Header = () => {
   return (
@@ -16,7 +17,7 @@ export const Header = () => {
         <ul className={styles.navMenu}>
           <li>
             <IframeModalButton url="/qsg" dialogHeader="Quick Start Guide">
-              Quick Start Guide
+              Quick Start
             </IframeModalButton>
           </li>
           <li>
@@ -27,6 +28,7 @@ export const Header = () => {
               Documentation
             </IframeModalButton>
           </li>
+          <ModelFileControls />
         </ul>
       </nav>
     </header>
