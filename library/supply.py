@@ -69,7 +69,11 @@ def apply_cpe_costs(df):
         df["access_capex"] = df["access_capex"].astype(float)
     mask = (df["cpe_cost"] != 0) & (df["assigned_users"] != 0)
     if "users_per_ue" in df.columns:
-        df.loc[mask, "access_capex"] += round(df.loc[mask, "cpe_cost"] * (df.loc[mask, "assigned_users"] / df.loc[mask, "users_per_ue"]), 2)
+        df["assigned_ue"] = 0
+        df.loc[mask, "assigned_ue"] = (
+            df.loc[mask, "assigned_users"] / df.loc[mask, "users_per_ue"]
+        ).round().astype(int)
+        df.loc[mask, "access_capex"] += (df.loc[mask, "cpe_cost"] * round((df.loc[mask, "assigned_users"] / df.loc[mask, "users_per_ue"])))
     else:
         df.loc[mask, "access_capex"] += round(df.loc[mask, "cpe_cost"] * df.loc[mask, "assigned_users"], 2)
     return df
