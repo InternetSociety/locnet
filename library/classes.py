@@ -271,6 +271,8 @@ class ModelerOutput(BaseModel):
     outcomes_table_columns: Optional[List[Dict[str, str]]] = None
     net_summary_table_rows: Optional[List[Dict[str, Any]]] = None
     net_summary_table_columns: Optional[List[Dict[str, str]]] = None
+    pbom_table_rows: Optional[List[Dict[str, Any]]] = None
+    pbom_table_columns: Optional[List[Dict[str, str]]] = None
     bom_table_rows: Optional[List[Dict[str, Any]]] = None
     bom_table_columns: Optional[List[Dict[str, str]]] = None
 
@@ -287,6 +289,8 @@ class ModelerAPIOutput(BaseModel):
     outcomes_table_columns: Optional[List[Dict[str, str]]] = None
     net_summary_table_rows: Optional[List[Dict[str, Any]]] = None
     net_summary_table_columns: Optional[List[Dict[str, str]]] = None
+    pbom_table_rows: Optional[List[Dict[str, Any]]] = None
+    pbom_table_columns: Optional[List[Dict[str, str]]] = None
     bom_table_rows: Optional[List[Dict[str, Any]]] = None
     bom_table_columns: Optional[List[Dict[str, str]]] = None
 

@@ -24,6 +24,100 @@ from library.classes import BuilderInput, ModelerOutput, PowerModelInput
 from math import pi, log10, ceil, sqrt
 
 
+NETWORK_BOM_ROW_COLUMNS = [
+    "location_name",
+    "technology_type",
+    "technology",
+    "cost_each",
+    "quantity",
+    "cpe_quantity",
+    "cpe_cost",
+    "network_capex",
+]
+
+
+def build_network_bom_dataframe(
+    ldf: pd.DataFrame, mdf: pd.DataFrame, bdf: pd.DataFrame
+) -> pd.DataFrame:
+    """Build the network equipment bill of materials from modeled equipment."""
+    empty_bom = pd.DataFrame(columns=NETWORK_BOM_ROW_COLUMNS)
+
+    access_bom = ldf[
+        [
+            "location_name",
+            "network_type",
+            "capex_per_sector",
+            "sectors",
+            "assigned_ue",
+            "cpe_cost",
+        ]
+    ].copy()
+    access_bom = access_bom.rename(
+        columns={
+            "network_type": "technology",
+            "capex_per_sector": "cost_each",
+            "sectors": "quantity",
+        }
+    )
+    access_bom["technology_type"] = "Access Network"
+    access_bom["cpe_quantity"] = np.where(
+        access_bom["cpe_cost"].notna() & access_bom["cpe_cost"].ne(0),
+        access_bom["assigned_ue"],
+        0,
+    )
+    access_bom = access_bom[NETWORK_BOM_ROW_COLUMNS[:-1]]
+
+    def build_link_bom(
+        link_df: pd.DataFrame,
+        technology_type: str,
+        technology_column: str,
+        cost_column: str,
+    ) -> pd.DataFrame:
+        if link_df.empty:
+            return empty_bom.copy()
+
+        link_bom = (
+            link_df.groupby(
+                ["location_name", technology_column], as_index=False, sort=False
+            )
+            .agg(
+                cost_each=(cost_column, "first"),
+                quantity=(technology_column, "size"),
+            )
+            .rename(columns={technology_column: "technology"})
+        )
+        link_bom["technology_type"] = technology_type
+        link_bom["cpe_quantity"] = 0
+        link_bom["cpe_cost"] = 0
+        return link_bom[NETWORK_BOM_ROW_COLUMNS[:-1]]
+
+    midhaul_bom = build_link_bom(
+        mdf,
+        "Midhaul Network",
+        "network_link_type",
+        "network_link_cost",
+    )
+    backhaul_bom = build_link_bom(
+        bdf,
+        "Backhaul Network",
+        "backhaul_link_type",
+        "backhaul_link_capex",
+    )
+
+    bom_df = pd.concat([access_bom, midhaul_bom, backhaul_bom], ignore_index=True)
+    for column in ["cost_each", "quantity", "cpe_quantity", "cpe_cost"]:
+        bom_df[column] = pd.to_numeric(bom_df[column], errors="coerce").fillna(0)
+    # CPE costs are per assigned user for technologies that require CPE.
+    bom_df["network_capex"] = (
+        bom_df["cost_each"] * bom_df["quantity"]
+        + bom_df["cpe_quantity"] * bom_df["cpe_cost"]
+    ).round(2)
+    bom_df = bom_df.sort_values(
+        by=["location_name", "technology_type", "technology"],
+        kind="stable",
+    ).reset_index(drop=True)
+
+    return bom_df[NETWORK_BOM_ROW_COLUMNS]
 
 
 def modeler(input_data: BuilderInput) -> ModelerOutput:
@@ -61,12 +155,14 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     user_final_year_peak_mbps = False  # The peak hour data rate per user in the final year of network operation
 
     # Get some model inputs that will remain constant through the calculations
-    hh_size = input_data.users_per_household
+    hh_size = input_data.users_per_household  # hh_size here only includes occupants from 10-79
     area_sqkm = input_data.area_sqkm
     year_1_traffic = int(input_data.year_1_traffic)
     traffic_growth = round(float(input_data.traffic_growth),2)
     traffic_growth_pct = traffic_growth / 100  # Defaults and user entries are for percent so we divide by 100
     system_life = int(input_data.system_life)
+    pop_growth_rate_input = input_data.pop_growth_rate if input_data.pop_growth_rate is not None else 0
+    pop_growth_rate = pop_growth_rate_input / 100  # User Interface C11
     # Get the number of service providers and their users from user input
     service_providers = int(input_data.service_providers) if input_data.service_providers is not None else 0
     sp_users_avg = input_data.service_provider_users
@@ -82,8 +178,9 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         businesses = 0
     logging.info(f"Business Users is {bus_users}")
 
-    total_potential_users_all_types = input_data.total_potential_users
-    # Get the total potential users and reduce them by service provider and business users
+    # Get the total potential users and multiply by the population growth rate to the third year
+    total_potential_users_all_types = int(input_data.total_potential_users * ((1 + pop_growth_rate) ** 3))
+    # then reduce them by service provider and business users
     # This means we don't double-count members of the community getting service from their employer
     potential_household_users = total_potential_users_all_types - sp_users - bus_users
     if potential_household_users <= 0:
@@ -96,10 +193,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     labour_cost = input_data.labour_cost
     labour_monthly = labour_cost * 40 * 4.3
     terrain_type = input_data.terrain_type
-    households = int(input_data.households_total) if input_data.households_total is not None else 0  # Household Decision Makers
-    pop_growth_rate_input = input_data.pop_growth_rate if input_data.pop_growth_rate is not None else 0
-    pop_growth_rate = pop_growth_rate_input / 100  # User Interface C11
-    hdm = int(households * ((1 + pop_growth_rate) ** 3)) # Year 3 Household Decision Makers adjusted for pop growth
+    # Get tne number of households and  multiply by the population growth rate to the third year
+    households = int(input_data.households_total* ((1 + pop_growth_rate) ** 3)) if input_data.households_total is not None else 0  # Household Decision Makers
 
     # PAF parameters for use in supply model
     paf_hours_month_seat = 129  # Supply model considers 50% availability of 10 hours day, 6 days per week.
@@ -244,19 +339,20 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
             # Determine the cost per sector
             tech_lifespan = tech["lifespan"]
             tech_refresh = ceil(system_life / tech_lifespan)
+            logging.info(f"tech_refresh: {tech_refresh}")
             cpe_cost = 0
             if tech["cpe_cost"]:
                 cpe_cost = tech["cpe_cost"]
             if tech["technology"] == "GPON":  # In the case of GPON the major inputs are cost of labour and area
                 gpon_base = tech["cost_per_sector"]
-                cost_per_sector = gpon_base + (households_supported * ((labour_cost * 8) + 50) * sqrt(area_sqkm / pi))
+                capex_per_sector = gpon_base + (households_supported * ((labour_cost * 8) + 50) * sqrt(area_sqkm / pi))
                 terrain_cost_multiplier = 1 + (1 - terrain_reduction)
-                cost_per_sector = cost_per_sector * terrain_cost_multiplier
-                logging.info(f'cost per sector: {cost_per_sector}')
+                capex_per_sector = capex_per_sector * terrain_cost_multiplier
+                logging.info(f'capex per sector: {capex_per_sector}')
             else:  # In the case of Mobile and FWA we take the cost per sector from the technologies table
-                cost_per_sector = tech["cost_per_sector"]
-            cost_per_sector = cost_per_sector * tech_refresh
-            access_capex = sectors * cost_per_sector
+                capex_per_sector = tech["cost_per_sector"]
+            capex_per_sector = capex_per_sector * tech_refresh
+            access_capex = sectors * capex_per_sector
             logging.info(f'access capex: {access_capex}')
 
             # load on the cost of power use over the lifetime of the access considering power type available
@@ -268,7 +364,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
             else:
                 sector_power_use = (watts_sector/1000) * system_life * 87600 * mains_power_cost_kwh
             logging.info(f'sector power use: {sector_power_use} from watts {watts} * {mains_power_cost_kwh} ')
-            cost_per_sector += sector_power_use
+            cost_per_sector = capex_per_sector + sector_power_use
             logging.info(f'cost per sector after power use added: {cost_per_sector}')
 
             # Determine the cost per pass
@@ -298,7 +394,9 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
             data_rows.append({
                 "location_name": location.location_name,
                 "network_type": nt,
+                "capex_per_sector": capex_per_sector,
                 "sectors": sectors,  # Number of sectors of the technology at this location
+                "network_capex": access_capex,
                 "vegetation_loss": vegetation_loss,
                 "terrain_reduction": terrain_reduction,
                 "spectrum_mhz": spectrum_mhz,  # the amount of spectrum per sector
@@ -317,6 +415,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
                 "users_supported": round(users_supported),
                 "cpe_cost": cpe_cost,
                 "access_capex": float(round(access_capex)),
+                "cost_per_sector": cost_per_sector,
                 "cost_per_passing": round(cost_per_pass),
                 "watts": watts,
                 "sector_power_use": sector_power_use,
@@ -425,7 +524,10 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
             system_type=location.power_type
         )
         power_results = power_model(input_data=power_model_input)
-        power_rows.append(power_results.power_row.model_dump())
+        power_row = power_results.power_row.model_dump()
+        power_row["structure_cost"] = location.tower_cost
+        power_rows.append(power_row)
+
         location_power_capex = power_results.power_capex
         power_capex += location_power_capex
         location_power_opex = power_results.power_opex
@@ -456,29 +558,31 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     podf = pd.DataFrame(power_rows)
 
     # Logging the created data frames to check what they're producing
-    logging.info(f'Data table (df): \n{ldf.to_string(index=False)}')
+    logging.info(f'Technology per Location Data: \n{ldf.to_string(index=False)}')
     if not mdf.empty:
         logging.info(f'Midhaul link data table (mdf): \n{mdf.to_string(index=False)}')
     logging.info(f'Backhaul link data table (bdf): \n{bdf.to_string(index=False)}')
     if not podf.empty:
         logging.info(f'Power sizing table (podf): \n{podf.to_string(index=False)}')
 
-    bom_table_columns = [
+    pbom_table_columns = [
         {"title": "Location", "data": "location_name"},
-        {"title": "Power Required (W)", "data": "power_required"},
-        {"title": "Mains Installation Cost", "data": "mains_power_installation_cost"},
+        {"title": "Structure Cost", "data": "structure_cost"},
+        {"title": "Power Use (W)", "data": "power_required"},
+        {"title": "Mains Installation", "data": "mains_power_installation_cost"},
         {"title": "Charger Cost", "data": "charger_cost"},
         {"title": "Battery Required (Wh)", "data": "battery_required"},
         {"title": "Battery Cost", "data": "battery_cost"},
-        {"title": "Solar Panels Required (m2)", "data": "panels_need_m2"},
+        {"title": "PV Panels Needed (m2)", "data": "panels_need_m2"},
         {"title": "Solar Cost", "data": "solar_cost"},
         {"title": "Power CapEx", "data": "power_capex"},
     ]
     if not podf.empty:
-        bom_table_rows = (
+        pbom_table_rows = (
             podf[
                 [
                     "location_name",
+                    "structure_cost",
                     "power_required",
                     "mains_power_installation_cost",
                     "charger_cost",
@@ -493,7 +597,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
             .to_dict(orient="records")
         )
     else:
-        bom_table_rows = []
+        pbom_table_rows = []
 
     # Assign users to technologies
     logging.info("Assigning users to technologies...")
@@ -505,7 +609,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     ldf = apply_cpe_costs(ldf)
 
     # Debug print to see users assigned and CapEx costs with CPE included
-    logging.info(f'Data table (df): \n{ldf.to_string(index=False)}')
+    logging.info(f'Technologies with Users Assigned: \n{ldf.to_string(index=False)}')
 
     # Calculate summary metrics on coverage and users
     total_coverage_area = float(ldf.groupby('location_name')['coverage_area'].max().sum())
@@ -572,6 +676,24 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
     total_backhaul_available = int(bdf['backhaul_link_speed'].sum().round())
     # Also update the CapEx figure for backhaul in case we've added more links
     backhaul_capex = int(bdf['backhaul_link_capex'].sum().round())
+
+    bom_table_columns = [
+        {"title": "Location", "data": "location_name"},
+        {"title": "Technology Type", "data": "technology_type"},
+        {"title": "Technology", "data": "technology"},
+        {"title": "Cost Each", "data": "cost_each"},
+        {"title": "Quantity", "data": "quantity"},
+        {"title": "CPE Quantity", "data": "cpe_quantity"},
+        {"title": "CPE Cost", "data": "cpe_cost"},
+        {"title": "Network CapEx", "data": "network_capex"},
+    ]
+    bom_df = build_network_bom_dataframe(ldf, mdf, bdf)
+    logging.info(
+        "Network equipment bill of materials (bom_df):\n%s",
+        bom_df.to_string(index=False),
+    )
+    bom_table_rows = bom_df.replace({np.nan: None}).to_dict(orient="records")
+
     # Add a column to the backhaul data frame proportioning the backhaul use by its capacity
     bdf["bh_proportion"] = bdf["user_capacity"] / bh_aggregate_users_supported
     # Show us the new dataframe
@@ -612,7 +734,7 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
 
     # Network Summary Table
     # region NET SUM Table
-    logging.info("Network Elements Summary Table")
+    logging.info("Network Details Summary Table")
 
     net_summary_table_rows, net_summary_table_columns = get_net_summary_table(
         country_name=country_name, system_life=system_life,
@@ -2314,6 +2436,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         "detailed_results": ldf.to_dict(orient='records'),
         "bom_table_columns": bom_table_columns,
         "bom_table_rows": bom_table_rows,
+        "pbom_table_columns": pbom_table_columns,
+        "pbom_table_rows": pbom_table_rows,
         "net_summary_table_columns": net_summary_table_columns,
         "net_summary_table_rows": net_summary_table_rows
     }

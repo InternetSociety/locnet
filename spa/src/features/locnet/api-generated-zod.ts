@@ -103,6 +103,8 @@ export const modelerApiOutputSchema = z.object({
     outcomes_table_columns: z.array(z.record(z.string(), z.any())).optional().nullable(),
     net_summary_table_rows: z.array(z.record(z.string(), z.any())).optional().nullable(),
     net_summary_table_columns: z.array(z.record(z.string(), z.any())).optional().nullable(),
+    pbom_table_rows: z.array(z.record(z.string(), z.any())).optional().nullable(),
+    pbom_table_columns: z.array(z.record(z.string(), z.any())).optional().nullable(),
     bom_table_rows: z.array(z.record(z.string(), z.any())).optional().nullable(),
     bom_table_columns: z.array(z.record(z.string(), z.any())).optional().nullable()
 });

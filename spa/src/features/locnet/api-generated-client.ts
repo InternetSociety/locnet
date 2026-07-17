@@ -359,6 +359,8 @@ export type ModelerAPIOutput = {
   outcomes_table_columns?: object[] | null;
   net_summary_table_rows?: object[] | null;
   net_summary_table_columns?: object[] | null;
+  pbom_table_rows?: object[] | null;
+  pbom_table_columns?: object[] | null;
   bom_table_rows?: object[] | null;
   bom_table_columns?: object[] | null;
 };
