@@ -1,0 +1,8 @@
+.modelFileLink[aria-disabled='true'] {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.fileInput {
+  display: none;
+}
