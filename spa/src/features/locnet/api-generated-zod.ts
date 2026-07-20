@@ -24,6 +24,8 @@ export const bodyPostHandlerPostSchema = z.object({
 
 export const locationDataSchema = z.object({
     location_name: z.string(),
+    latitude: z.number(),
+    longitude: z.number(),
     tower_cost: z.number().nullable(),
     network_type: z.array(z.string()),
     sectors: z.array(z.number()),
@@ -32,6 +34,16 @@ export const locationDataSchema = z.object({
     backhaul_cost_base: z.array(z.number()).nullable(),
     backhaul_cost_mbps: z.array(z.number()).nullable(),
     power_type: z.string().nullable()
+});
+
+export const boundsResponseSchema = z.object({
+    iso_3: z.string(),
+    centroid_lat: z.number(),
+    centroid_long: z.number(),
+    bbox_west: z.number(),
+    bbox_south: z.number(),
+    bbox_east: z.number(),
+    bbox_north: z.number()
 });
 
 export const characteristicsRequestSchema = z.object({

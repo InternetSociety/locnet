@@ -3,7 +3,7 @@ import {
   type BuilderInput,
   type CharacteristicsRequest,
 } from './api-generated-client';
-import { builderInputSchema } from './api-generated-zod';
+import { boundsResponseSchema, builderInputSchema } from './api-generated-zod';
 import type { EditableLocNetForm } from './formData';
 import { debouncePromise } from './utils';
 
@@ -42,6 +42,42 @@ export const getCharacteristics = debouncePromise(
   getCharacteristicsInner,
   API_DEBOUNCE_TIME_MS,
 );
+
+let boundsAbortController: AbortController | undefined = undefined;
+
+const getBoundsInner = async (
+  props: CharacteristicsRequest,
+): Promise<EditableLocNetForm['api']['bounds']> => {
+  console.log('Requesting bounds of ', props.iso_3);
+  if (boundsAbortController) {
+    boundsAbortController.abort();
+  }
+  boundsAbortController = new AbortController();
+
+  try {
+    const response = await fetch(
+      `/api/bounds/${encodeURIComponent(props.iso_3)}`,
+      { signal: boundsAbortController.signal },
+    );
+    if (!response.ok) {
+      throw Error(`Server returned ${response.status}`);
+    }
+    const responseBody: unknown = await response.json();
+    const { data: bounds, error } =
+      boundsResponseSchema.safeParse(responseBody);
+    if (error) {
+      throw Error('The server returned invalid bounds data.');
+    }
+    return bounds;
+  } catch (e) {
+    return {
+      type: 'error',
+      message: String(e),
+    };
+  }
+};
+
+export const getBounds = debouncePromise(getBoundsInner, API_DEBOUNCE_TIME_MS);
 
 export const validateBuilderInput = async (
   input: unknown,

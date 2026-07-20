@@ -84,9 +84,21 @@ class TechnologyDetail(BaseModel):
     technology_name: str
 
 
+class BoundsResponse(BaseModel):
+    iso_3: str
+    centroid_lat: float
+    centroid_long: float
+    bbox_west: float
+    bbox_south: float
+    bbox_east: float
+    bbox_north: float
+
+
 # Define the input data model
 class LocationData(BaseModel):
     location_name: str
+    latitude: float
+    longitude: float
     tower_cost: Optional[float]
     network_type: List[str]
     sectors: List[int]

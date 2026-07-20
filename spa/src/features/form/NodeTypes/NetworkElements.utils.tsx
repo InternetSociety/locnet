@@ -56,6 +56,8 @@ export const newBlankLocation = (
     index,
     number: index + 1,
     location_name: `Location ${index + 1}`,
+    latitude: 0,
+    longitude: 0,
     networkTypes: [],
     towerType: {
       name: '',

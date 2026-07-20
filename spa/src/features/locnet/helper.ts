@@ -68,6 +68,8 @@ export const sampleData: BuilderInput = {
   locations: [
     {
       location_name: 'Location 1',
+      latitude: 0,
+      longitude: 0,
       power_type: 'power_mains_rel',
       tower_cost: 1000,
       network_type: ['ISM FWA 5.8 GHz', 'ISM Wi-Fi 2.4 GHz'],
@@ -79,6 +81,8 @@ export const sampleData: BuilderInput = {
     },
     {
       location_name: 'Location 2',
+      latitude: 0,
+      longitude: 0,
       power_type: 'power_mains_rel',
       tower_cost: 1000,
       network_type: ['ISM FWA 5.8 GHz', 'ISM Wi-Fi 2.4 GHz'],
@@ -90,6 +94,8 @@ export const sampleData: BuilderInput = {
     },
     {
       location_name: 'Location 3',
+      latitude: 0,
+      longitude: 0,
       power_type: 'power_solar',
       tower_cost: 1000,
       network_type: ['ISM FWA 5.8 GHz', 'ISM Wi-Fi 2.4 GHz'],
