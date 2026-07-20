@@ -323,6 +323,8 @@ export type LanguagesResponse = object;
 
 export type LocationData = {
   location_name: string;
+  latitude: number;
+  longitude: number;
   tower_cost: number | null;
   network_type: string[];
   sectors: number[];
@@ -331,6 +333,16 @@ export type LocationData = {
   backhaul_cost_base: number[] | null;
   backhaul_cost_mbps: number[] | null;
   power_type: string | null;
+};
+
+export type BoundsResponse = {
+  iso_3: string;
+  centroid_lat: number;
+  centroid_long: number;
+  bbox_west: number;
+  bbox_south: number;
+  bbox_east: number;
+  bbox_north: number;
 };
 
 export type MidhaulDetail = {
