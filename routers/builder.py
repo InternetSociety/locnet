@@ -29,6 +29,19 @@ def modeler_logic(input_data: BuilderInput) -> ModelerOutput:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.post(
+    "/api/modeler/validate",
+    summary="Validate a saved network model",
+    description="Validates a saved network model against the BuilderInput schema.",
+    response_model=BuilderInput,
+    tags=["API POST Endpoints"],
+    include_in_schema=False,
+)
+async def validate_model_input(input_data: BuilderInput) -> BuilderInput:
+    """Return a BuilderInput only after Pydantic has validated the request body."""
+    return input_data
+
+
 # POST endpoint for form submission and returning JSON
 @router.post("/api/modeler", summary="Network Modelling Function (JSON)",
              description="This endpoint accepts a JSON structure containing the user's input parameters and returns the results as JSON",

@@ -7,6 +7,7 @@ import { editableLocNetModel, type EditableLocNetModel } from './model';
 import { useLocNetServerSubmit } from './submit';
 import styles from './Form.module.css';
 import { DeveloperMenu } from './DeveloperMenu';
+import { Header } from '../template/Header';
 
 export const Form = () => {
   const useStaticFormResponse = useStaticFormTs<
@@ -23,17 +24,20 @@ export const Form = () => {
   const submitHandler = useHandleSubmit(handleLocNetServerSubmit);
 
   return (
-    <div className={styles.page}>
-      <StaticFormTsProvider
-        // @ts-expect-error TODO improve types
-        value={useStaticFormResponse}
-      >
-        <form onSubmit={submitHandler} onInvalid={handleInvalid}>
-          <RenderNodes nodes={locnetStaticFormValue.nodes} id="nodes" />
-        </form>
+    <StaticFormTsProvider
+      // @ts-expect-error TODO improve types
+      value={useStaticFormResponse}
+    >
+      <Header />
+      <main>
+        <div className={styles.page}>
+          <form onSubmit={submitHandler} onInvalid={handleInvalid}>
+            <RenderNodes nodes={locnetStaticFormValue.nodes} id="nodes" />
+          </form>
 
-        <DeveloperMenu />
-      </StaticFormTsProvider>
-    </div>
+          <DeveloperMenu />
+        </div>
+      </main>
+    </StaticFormTsProvider>
   );
 };

@@ -1,5 +1,4 @@
 import { Form } from './features/locnet/Form';
-import { Header } from './features/template/Header';
 import { useScrollBarWidth } from './ScrollBarWidth';
 import './App.css';
 import { IntlProvider } from './features/form/Intl';
@@ -10,10 +9,7 @@ export const App = () => {
 
   return (
     <IntlProvider>
-      <Header />
-      <main>
-        <Form />
-      </main>
+      <Form />
       <div id="printing-message">
         <TiDocument size="10rem" />
       </div>

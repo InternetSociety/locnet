@@ -1,16 +1,9 @@
 .topNav {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
+  align-items: stretch;
+  gap: 0.75rem;
   padding: 0 var(--page-padding-x);
-}
-
-@media (min-width: 1000px) {
-  .topNav {
-    flex-direction: row;
-    gap: 1rem;
-  }
 }
 
 .topNavFirst {
@@ -22,11 +15,14 @@
 }
 
 .navMenu {
+  width: 100%;
   padding: 0;
   margin: 0;
   list-style: none;
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   gap: 1rem;
 }
 
@@ -36,22 +32,28 @@
 }
 
 .navMenu a {
-  display: inline-block;
-  padding: 0.5em 0;
-  color: #058;  
-  transition: all;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5em 0.75em;
+  color: #058;
+  background: var(--interactive-box-background);
+  border: var(--interactive-box-toggle-selected-border);
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
 }
-
-@media (min-width: 1000px) {
-  .navMenu a {
-    white-space: nowrap;
-  }
-}
-
 
 .navMenu a:hover,
 .navMenu a:focus {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--focus-background-color);
+}
+
+.navMenu a:focus-visible {
+  outline: 2px solid #058;
+  outline-offset: 2px;
 }
 
 .pageTitle {
