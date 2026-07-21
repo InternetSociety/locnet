@@ -1,10 +1,19 @@
 from library.helpers import *
 from library.classes import *
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.templating import Jinja2Templates
 from typing import List
 import logging
+import re
+import httpx
 from fastapi import Body
+from config import (
+    MAP_TILE_BASE_URL,
+    MAP_STYLE_PATH,
+    MAPTILER_API_KEY,
+    MAP_TILE_REFERER,
+    MAP_PUBLIC_BASE_URL,
+)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates/")
@@ -460,4 +469,153 @@ async def get_characteristics(request: CharacteristicsRequest):
     except Exception as e:
         logging.error(f"Error in get_characteristics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/map_config", summary="Map configuration for the location picker",
+            description="Returns the MapLibre GL JS style URL (proxied through this "
+                        "server) used by the network location picker.",
+            tags=["API GET Endpoints"],
+            include_in_schema=False)
+async def get_map_config():
+    # The style is served through our own /api/tiles proxy so the browser never
+    # talks to the upstream tile provider directly and the API key stays server-side.
+    return {"style_url": f"/api/tiles{MAP_STYLE_PATH}"}
+
+
+@router.get("/api/bounds/{iso_3}", summary="Country centroid and bounding box",
+            description="Supply an ISO3 country code and get the centroid and bounding "
+                        "box for that country from the country_bounds table. Used by the "
+                        "network location picker to centre and constrain the map.",
+            response_model=BoundsResponse,
+            tags=["API GET Endpoints"],
+            include_in_schema=False)
+async def get_country_bounds(iso_3: str):
+    try:
+        iso_3 = iso_3.upper()
+        bounds = get_bounds(iso_3)
+        if bounds is None:
+            raise HTTPException(status_code=404, detail=f"Bounds for ISO3 '{iso_3}' not found.")
+        return bounds
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error in get_country_bounds: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Content types whose bodies contain URLs that must be rewritten to route back
+# through this proxy (style documents, TileJSON, etc.).
+_REWRITABLE_TILE_CONTENT_TYPES = ("application/json", "application/x-protobuf-tilejson")
+
+
+def _public_proxy_base(request: Request) -> str:
+    """Return the ABSOLUTE base URL for the /api/tiles proxy as the browser sees
+    it (scheme + host + "/api/tiles").
+
+    This app always runs inside Docker, and on staging/production it sits behind a
+    TLS-terminating Cloudflare Tunnel (cloudflared). The tunnel terminates HTTPS at
+    Cloudflare's edge and forwards plain HTTP to the container, so
+    ``request.url.scheme`` is "http" even though the user loaded the page over
+    HTTPS. If we build the (mandatory) absolute tile URLs from that scheme, the
+    browser blocks them as *mixed content* on an HTTPS page.
+
+    To stay correct in every environment we honour the standard reverse-proxy
+    headers that cloudflared sets (``X-Forwarded-Proto`` / ``X-Forwarded-Host``),
+    falling back to the request's own scheme/host when they are absent (e.g. local
+    development, where the page is served over plain HTTP without a tunnel). An
+    explicit ``MAP_PUBLIC_BASE_URL`` in config always wins if provided."""
+    if MAP_PUBLIC_BASE_URL:
+        return f"{MAP_PUBLIC_BASE_URL.rstrip('/')}/api/tiles"
+
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    scheme = (
+        forwarded_proto.split(",")[0].strip()
+        if forwarded_proto
+        else request.url.scheme
+    )
+
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get(
+        "host"
+    )
+    host = (
+        forwarded_host.split(",")[0].strip()
+        if forwarded_host
+        else request.url.netloc
+    )
+
+    return f"{scheme}://{host}/api/tiles"
+
+
+def _rewrite_tile_urls(body: bytes, proxy_base: str) -> bytes:
+    """Rewrite upstream tile-provider URLs so nested resources (tiles, sprites,
+    glyphs, sources) are also fetched through the /api/tiles proxy, and strip any
+    API key so it is never exposed to the browser.
+
+    The rewritten URLs must be *absolute* (scheme + host). MapLibre GL JS loads
+    vector tiles, glyphs and the sprite inside a Web Worker, where root-relative
+    URLs like "/api/tiles/..." cannot be resolved against the page location and
+    fail with "Failed to construct 'Request'". Raster tiles happen to load on the
+    main thread, which is why previously only the satellite basemap appeared while
+    all vector overlays (roads, labels, borders) silently dropped."""
+    text = body.decode("utf-8", errors="replace")
+    # Point every upstream URL back at our proxy, using an absolute URL so the
+    # MapLibre worker can resolve it.
+    text = text.replace(MAP_TILE_BASE_URL, proxy_base)
+    # Remove the API key query parameter wherever it appears.
+    text = re.sub(r"([?&])key=[^\"'&\\\s]*", r"\1", text)
+    # Tidy up dangling separators left behind after key removal.
+    text = text.replace("?&", "?")
+    text = re.sub(r"[?&]([\"'])", r"\1", text)
+    return text.encode("utf-8")
+
+
+@router.get("/api/tiles/{path:path}", summary="Map tile proxy",
+            description="Proxies map tile, style, sprite and glyph requests to the "
+                        "configured upstream tile provider, injecting the API key and "
+                        "an Origin/Referer header server-side.",
+            tags=["API GET Endpoints"],
+            include_in_schema=False)
+async def proxy_tiles(path: str, request: Request):
+    upstream_url = f"{MAP_TILE_BASE_URL}/{path}"
+
+    # Forward the client's query params and add the provider API key.
+    params = dict(request.query_params)
+    if MAPTILER_API_KEY:
+        params["key"] = MAPTILER_API_KEY
+
+    # Send Origin/Referer so the upstream provider attributes the request to us.
+    headers = {
+        "Origin": MAP_TILE_REFERER,
+        "Referer": MAP_TILE_REFERER,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            upstream = await client.get(upstream_url, params=params, headers=headers)
+    except httpx.HTTPError as e:
+        logging.error(f"Error proxying tile request to {upstream_url}: {e}")
+        raise HTTPException(status_code=502, detail="Error fetching map tiles.")
+
+    content_type = upstream.headers.get("content-type", "application/octet-stream")
+    content = upstream.content
+
+    # Rewrite URLs in JSON documents (style.json, TileJSON) to route through the proxy.
+    if any(content_type.startswith(ct) for ct in _REWRITABLE_TILE_CONTENT_TYPES):
+        # Build an absolute base URL for this proxy so the rewritten sprite/glyph/
+        # tile URLs are absolute (required by the MapLibre Web Worker). The scheme
+        # and host honour reverse-proxy headers (Cloudflare Tunnel) so HTTPS pages
+        # never receive http:// tile URLs (mixed content). See _public_proxy_base.
+        proxy_base = _public_proxy_base(request)
+        content = _rewrite_tile_urls(content, proxy_base)
+
+    response_headers = {}
+    if "cache-control" in upstream.headers:
+        response_headers["cache-control"] = upstream.headers["cache-control"]
+
+    return Response(
+        content=content,
+        status_code=upstream.status_code,
+        media_type=content_type,
+        headers=response_headers,
+    )
 

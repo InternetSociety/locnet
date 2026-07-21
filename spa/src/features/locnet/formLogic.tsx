@@ -6,7 +6,7 @@ import {
   type EditableLocNetModel,
   type LocNetModel,
 } from './model';
-import { getCharacteristics } from './api';
+import { getBounds, getCharacteristics } from './api';
 
 type LocNetFormValueResolver = Resolver<
   EditableLocNetForm,
@@ -36,6 +36,9 @@ export const locNetFormResolver: LocNetFormValueResolver = ({
         'api.characteristics',
         getCharacteristics({ iso_3: newValue }),
       );
+      // Load the country's map centroid and bounding box for the location picker
+      immerForm.api.bounds = undefined;
+      queueFormSideEffect('api.bounds', getBounds({ iso_3: newValue }));
       immerForm.nodes[3].isLoading = true;
       immerForm.nodes[0].isOpen = false;
       immerForm.nodes[0].isButtonVisible = true;

@@ -102,6 +102,35 @@ def get_centroid(iso_2):
         raise Exception(f"Failed to load {query_name} data: {str(e)}")
 
 
+def get_bounds(iso_3):
+    # Country centroid and bounding-box data from the country_bounds table.
+    # Used by the location picker to centre the map and constrain the marker
+    # and latitude/longitude inputs to the selected country.
+    query_name = "bounds"
+    sql_query = (
+        "SELECT iso_3, centroid_lat, centroid_long, "
+        "bbox_west, bbox_south, bbox_east, bbox_north "
+        "FROM country_bounds WHERE iso_3 = '{0}'".format(iso_3.upper())
+    )
+    try:
+        data = fetch_grist_data(sql_query)
+        if data and isinstance(data, list):
+            first_result = data[0]  # Extract first matching row
+            return {
+                "iso_3": first_result["iso_3"],
+                "centroid_lat": float(first_result["centroid_lat"]),
+                "centroid_long": float(first_result["centroid_long"]),
+                "bbox_west": float(first_result["bbox_west"]),
+                "bbox_south": float(first_result["bbox_south"]),
+                "bbox_east": float(first_result["bbox_east"]),
+                "bbox_north": float(first_result["bbox_north"]),
+            }
+        # If no result found, return None
+        return None
+    except Exception as e:
+        raise Exception(f"Failed to load {query_name} data: {str(e)}")
+
+
 def get_frequencies():
     # Finds all frequencies in use in the manually populated technologies table
     query_name = "frequencies"

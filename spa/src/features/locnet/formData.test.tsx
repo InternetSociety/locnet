@@ -8,6 +8,7 @@ test('Form data exists', async () => {
     set() {},
     api: {
       characteristics: undefined,
+      bounds: undefined,
       modelerAPIOutput: undefined
     },
   };

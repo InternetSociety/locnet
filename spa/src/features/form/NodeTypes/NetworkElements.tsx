@@ -30,6 +30,8 @@ import {
 } from './NetworkElements.utils';
 import { Text } from '../Intl';
 import { useIntlIdOrText } from '../Intl.utils';
+import { RenderLocationPicker } from './LocationPicker';
+import { useBoundsData } from './useBoundsData';
 import { removeSoftDeletes } from '../softDeletes';
 import { useCustomErrorRef } from '../useCustomError';
 import { NBSP } from '../../../utils/strings';
@@ -80,6 +82,8 @@ export const NetworkElementSchema = FormNodeSchema.extend({
   number: z.number(),
   location_name: z.string(),
   location_name_error: z.string().optional(),
+  latitude: z.number(),
+  longitude: z.number(),
   networkTypes: NetworkTypeSchema.array(),
   towerType: TowerTypeSchema,
   midhaulLink: MidhaulLinkSchema.array(),
@@ -101,6 +105,7 @@ type Props = NodeProps<NetworkLocations>;
 
 export const RenderNetworkElements = ({ node, formPath }: Props) => {
   const { useFormAndModel } = useStaticFormTsContext();
+  const boundsData = useBoundsData();
   const locationsId = formPathJoin<NetworkLocations>(formPath, 'locations');
   const networkLocationsCountRef = useRef<HTMLInputElement>(null);
   const [networkLocations, setNetworkLocations] = useFormAndModel(
@@ -117,10 +122,13 @@ export const RenderNetworkElements = ({ node, formPath }: Props) => {
         ...prevLocations,
         newBlankLocation(prevLocations.length, {
           location_name: newLocationName(nonSoftDeletedLocations),
+          // Default new locations to the selected country's centroid.
+          latitude: boundsData?.centroid_lat ?? 0,
+          longitude: boundsData?.centroid_long ?? 0,
         }),
       ];
     });
-  }, [setNetworkLocations]);
+  }, [setNetworkLocations, boundsData]);
 
   const canDelete = networkLocations
     ? networkLocations.filter(
@@ -324,6 +332,14 @@ const RenderNetworkLocation = ({
           data-testid={`location-${index}-name`}
         />
       </label>
+
+      <RenderLocationPicker
+        id={id}
+        modelPath={modelPath}
+        locationIndex={index}
+        defaultLatitude={networkLocation.latitude}
+        defaultLongitude={networkLocation.longitude}
+      />
 
       <RenderNetworkTypes
         id={networkTypesId}

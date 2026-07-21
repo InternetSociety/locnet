@@ -1,15 +1,25 @@
 from turtle import done
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Form, HTTPException, Query
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
+from markdown import markdown
 from pydantic import BaseModel
 from routers import lookups
 from routers.builder import router as builder_router
 from library.helpers import *
-from library.confluence import get_documentation_content, get_qsg_content
 import logging
+
+
+DOCUMENTS_DIRECTORY = Path(__file__).resolve().parent / "docs"
+
+
+def render_markdown_document(filename: str) -> str:
+    """Read a local Markdown document and convert it to HTML for a template."""
+    markdown_source = (DOCUMENTS_DIRECTORY / filename).read_text(encoding="utf-8")
+    return markdown(markdown_source, extensions=["extra", "toc"])
 
 app = FastAPI(title='Community Network Modeler',
               description='An application to model simple community networks',
@@ -18,6 +28,7 @@ app = FastAPI(title='Community Network Modeler',
 app.mount("/cache", StaticFiles(directory="cache"), name="cache")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/assets", StaticFiles(directory="spa/dist/assets"), name="assets")
+app.mount("/documentation-assets", StaticFiles(directory=DOCUMENTS_DIRECTORY), name="documentation-assets")
 
 app.include_router(lookups.router)
 app.include_router(builder_router)
@@ -87,8 +98,7 @@ async def documentation_page(request: Request, lang: str = 'en'):
         text_data = get_text()
         selected_text = {item['element']: item[lang] for item in text_data}
         
-        # Get documentation content from Confluence
-        documentation_content = get_documentation_content()
+        documentation_content = render_markdown_document("documentation.md")
         
         return templates.TemplateResponse("documentation.html",
                                          {"request": request,
@@ -108,8 +118,7 @@ async def qsg_page(request: Request, lang: str = 'en'):
         text_data = get_text()
         selected_text = {item['element']: item[lang] for item in text_data}
         
-        # Get Quick Start Guide content from Confluence
-        qsg_content = get_qsg_content()
+        qsg_content = render_markdown_document("qsg.md")
         
         return templates.TemplateResponse("qsg.html",
                                          {"request": request,

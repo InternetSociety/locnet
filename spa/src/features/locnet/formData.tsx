@@ -4,7 +4,11 @@ import {
   makeStaticFormTSValue,
 } from '../form/node';
 import type { ObjectPathDeep } from '../form/path';
-import type { DefaultsDetail, ModelerAPIOutput } from './api-generated-client';
+import type {
+  BoundsResponse,
+  DefaultsDetail,
+  ModelerAPIOutput,
+} from './api-generated-client';
 import type { ModelMapping } from './model';
 
 type ApiError = {
@@ -221,6 +225,7 @@ export const locNetForm = {
   ],
   api: {
     characteristics: undefined as DefaultsDetail[] | ApiError | undefined,
+    bounds: undefined as BoundsResponse | ApiError | undefined,
     modelerAPIOutput: undefined as undefined | ModelerAPIOutput | ApiError,
   },
 } as const satisfies Root;
