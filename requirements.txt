@@ -1,4 +1,5 @@
 fastapi[standard]==0.115.11
+Markdown>=3.7,<4.0
 pandas>=2.2.3
 pydantic==2.8.2
 python-dotenv==1.0.1

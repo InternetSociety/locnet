@@ -508,6 +508,44 @@ async def get_country_bounds(iso_3: str):
 _REWRITABLE_TILE_CONTENT_TYPES = ("application/json", "application/x-protobuf-tilejson")
 
 
+def _public_proxy_base(request: Request) -> str:
+    """Return the ABSOLUTE base URL for the /api/tiles proxy as the browser sees
+    it (scheme + host + "/api/tiles").
+
+    This app always runs inside Docker, and on staging/production it sits behind a
+    TLS-terminating Cloudflare Tunnel (cloudflared). The tunnel terminates HTTPS at
+    Cloudflare's edge and forwards plain HTTP to the container, so
+    ``request.url.scheme`` is "http" even though the user loaded the page over
+    HTTPS. If we build the (mandatory) absolute tile URLs from that scheme, the
+    browser blocks them as *mixed content* on an HTTPS page.
+
+    To stay correct in every environment we honour the standard reverse-proxy
+    headers that cloudflared sets (``X-Forwarded-Proto`` / ``X-Forwarded-Host``),
+    falling back to the request's own scheme/host when they are absent (e.g. local
+    development, where the page is served over plain HTTP without a tunnel). An
+    explicit ``MAP_PUBLIC_BASE_URL`` in config always wins if provided."""
+    if MAP_PUBLIC_BASE_URL:
+        return f"{MAP_PUBLIC_BASE_URL.rstrip('/')}/api/tiles"
+
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    scheme = (
+        forwarded_proto.split(",")[0].strip()
+        if forwarded_proto
+        else request.url.scheme
+    )
+
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get(
+        "host"
+    )
+    host = (
+        forwarded_host.split(",")[0].strip()
+        if forwarded_host
+        else request.url.netloc
+    )
+
+    return f"{scheme}://{host}/api/tiles"
+
+
 def _rewrite_tile_urls(body: bytes, proxy_base: str) -> bytes:
     """Rewrite upstream tile-provider URLs so nested resources (tiles, sprites,
     glyphs, sources) are also fetched through the /api/tiles proxy, and strip any
@@ -564,10 +602,10 @@ async def proxy_tiles(path: str, request: Request):
     # Rewrite URLs in JSON documents (style.json, TileJSON) to route through the proxy.
     if any(content_type.startswith(ct) for ct in _REWRITABLE_TILE_CONTENT_TYPES):
         # Build an absolute base URL for this proxy so the rewritten sprite/glyph/
-        # tile URLs are absolute (required by the MapLibre Web Worker). Prefer an
-        # explicit public URL from config; otherwise derive it from the request.
-        base = (MAP_PUBLIC_BASE_URL or str(request.base_url)).rstrip("/")
-        proxy_base = f"{base}/api/tiles"
+        # tile URLs are absolute (required by the MapLibre Web Worker). The scheme
+        # and host honour reverse-proxy headers (Cloudflare Tunnel) so HTTPS pages
+        # never receive http:// tile URLs (mixed content). See _public_proxy_base.
+        proxy_base = _public_proxy_base(request)
         content = _rewrite_tile_urls(content, proxy_base)
 
     response_headers = {}
