@@ -166,7 +166,7 @@ export const RenderLocationPicker = ({
     if (!container) return;
 
     let cancelled = false;
-    const maxBounds: [[number, number], [number, number]] = [
+    const countryBounds: [[number, number], [number, number]] = [
       [boundsData.bbox_west, boundsData.bbox_south],
       [boundsData.bbox_east, boundsData.bbox_north],
     ];
@@ -182,8 +182,9 @@ export const RenderLocationPicker = ({
             style: styleUrl,
             center: [coordsRef.current.lng, coordsRef.current.lat],
             zoom: 3,
-            // Prevents panning or zooming out beyond the country bounding box.
-            maxBounds,
+            // MapLibre supports zoom levels down to -2. This lets us set the
+            // country-derived minimum zoom once the initial fit is complete.
+            minZoom: -2,
           });
         } catch (error) {
           console.error('Failed to initialise MapLibre map', error);
@@ -192,7 +193,17 @@ export const RenderLocationPicker = ({
         mapRef.current = map;
 
         map.on('load', () => {
-          map.fitBounds(maxBounds, { animate: false, padding: 20 });
+          map.fitBounds(countryBounds, { animate: false, padding: 20 });
+          const countryCenter = map.getCenter();
+          const countryZoom = map.getZoom();
+          const minZoom = Math.max(-2, countryZoom - 2);
+
+          // Use the viewport at two levels farther out as the map boundary.
+          // This preserves panning limits while permitting the requested zoom.
+          map.jumpTo({ center: countryCenter, zoom: minZoom });
+          map.setMaxBounds(map.getBounds());
+          map.jumpTo({ center: countryCenter, zoom: countryZoom });
+          map.setMinZoom(minZoom);
         });
 
         const marker = new Marker({ draggable: true, color: '#e53935' })
@@ -217,11 +228,6 @@ export const RenderLocationPicker = ({
       cancelled = true;
     };
   }, [boundsData, applyMarkerPosition]);
-
-  // Keep the marker in sync when coordinates change from the text inputs.
-  useEffect(() => {
-    markerRef.current?.setLngLat([longitude, latitude]);
-  }, [latitude, longitude]);
 
   // Tear down the map on unmount.
   useEffect(
@@ -265,6 +271,13 @@ export const RenderLocationPicker = ({
     },
     [setLongitude],
   );
+
+  const handleUpdateMap = useCallback(() => {
+    if (latInvalid || lonInvalid) return;
+    const coordinates: [number, number] = [longitude, latitude];
+    markerRef.current?.setLngLat(coordinates);
+    mapRef.current?.flyTo({ center: coordinates, zoom: 15 });
+  }, [latInvalid, lonInvalid, latitude, longitude]);
 
   return (
     <div className={styles.locationPickerContainer}>
@@ -317,6 +330,15 @@ export const RenderLocationPicker = ({
             data-testid={`location-${locationIndex}-longitude`}
           />
         </label>
+        <button
+          type="button"
+          onClick={handleUpdateMap}
+          disabled={!boundsData || latInvalid || lonInvalid}
+          className={styles.updateMapButton}
+          data-testid={`location-${locationIndex}-update-map`}
+        >
+          <Text intlId="update_map" />
+        </button>
       </div>
     </div>
   );

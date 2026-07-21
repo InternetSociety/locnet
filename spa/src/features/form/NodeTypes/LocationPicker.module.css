@@ -38,3 +38,23 @@
   background-color: #ffecec;
   color: #b71c1c;
 }
+
+.updateMapButton {
+  align-self: flex-end;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--interactive-box-background);
+  border-radius: 4px;
+  background: var(--interactive-box-background);
+  color: inherit;
+  cursor: pointer;
+}
+
+.updateMapButton:hover:not(:disabled),
+.updateMapButton:focus-visible:not(:disabled) {
+  background-color: var(--focus-background-color);
+}
+
+.updateMapButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
