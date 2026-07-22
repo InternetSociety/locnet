@@ -36,6 +36,7 @@ import { removeSoftDeletes } from '../softDeletes';
 import { useCustomErrorRef } from '../useCustomError';
 import { NBSP } from '../../../utils/strings';
 import { clamp } from 'lodash-es';
+import { hasConfiguredLocation } from '../../locnet/locationValidation';
 
 export const BackhaulLinkSchema = z.object({
   key: z.string(),
@@ -140,8 +141,15 @@ export const RenderNetworkElements = ({ node, formPath }: Props) => {
     networkLocations.filter((networkLocation) => !networkLocation.isSoftDeleted)
       .length > 0;
 
+  const hasAConfiguredLocation = hasConfiguredLocation(networkLocations);
+
   const networkCountInvalidMessage = useIntlIdOrText(
     'alert_add_one_location',
+    undefined,
+  );
+
+  const configuredLocationInvalidMessage = useIntlIdOrText(
+    'alert_configure_location',
     undefined,
   );
 
@@ -161,6 +169,9 @@ export const RenderNetworkElements = ({ node, formPath }: Props) => {
     if (!networkCountIsValid) {
       const errorText = networkCountInvalidMessage ?? 'Field error';
       networkLocationsCount.setCustomValidity(errorText);
+    } else if (!hasAConfiguredLocation) {
+      const errorText = configuredLocationInvalidMessage ?? 'Field error';
+      networkLocationsCount.setCustomValidity(errorText);
     } else {
       console.log('setting valid');
       networkLocationsCount.setCustomValidity(
@@ -171,6 +182,8 @@ export const RenderNetworkElements = ({ node, formPath }: Props) => {
     networkLocationsCountRef,
     networkCountIsValid,
     networkCountInvalidMessage,
+    hasAConfiguredLocation,
+    configuredLocationInvalidMessage,
   ]);
 
   return (

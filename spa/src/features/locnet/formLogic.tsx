@@ -7,6 +7,7 @@ import {
   type LocNetModel,
 } from './model';
 import { getBounds, getCharacteristics } from './api';
+export { hasConfiguredLocation } from './locationValidation';
 
 type LocNetFormValueResolver = Resolver<
   EditableLocNetForm,
