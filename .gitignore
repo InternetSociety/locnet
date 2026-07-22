@@ -6,4 +6,3 @@ docker-compose.yml
 .DS_Store
 .idea
 cache
-static/confluence_images

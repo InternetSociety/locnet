@@ -31,7 +31,7 @@
 
 ## Data and integrations
 - Menu and lookup data are provided by a remote database accessible via API (see Environment and configuration). The application depends on this API connection to populate its menus.
-- Documentation/QSG content is fetched from Confluence at runtime and rendered into `/documentation` and `/qsg` respectively.
+- Documentation/QSG content is now in git and is rendered into `/documentation` and `/qsg` respectively.
 
 ## Architecture at a glance
 - Single repo with a Python FastAPI backend and a static SPA frontend.
