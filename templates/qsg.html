@@ -12,6 +12,11 @@
 </head>
 <body>
     <div class="content-spacing">
+        {% if not embedded %}
+        <nav class="document-navigation" aria-label="Document navigation">
+            <a class="document-back-link" href="/">Back to main page</a>
+        </nav>
+        {% endif %}
         <!-- Quick Start Guide content will be rendered here -->
         {{ qsg_content|safe }}
     </div>

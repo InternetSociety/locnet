@@ -96,3 +96,31 @@ tr.shown td.details-control {
 .content-spacing {
   padding: 16px 24px 48px 24px;
 }
+
+.document-navigation {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.document-back-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5em 0.75em;
+  color: #000;
+  background: #eee;
+  border: 1px solid #999;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.document-back-link:hover,
+.document-back-link:focus {
+  background: #ddd;
+}
+
+.document-back-link:focus-visible {
+  outline: 2px solid #058;
+  outline-offset: 2px;
+}

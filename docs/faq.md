@@ -1,4 +1,46 @@
 # Frequently Asked Questions
 
-## New Frequently Asked Questions Will Go Here
-And the answers will appear below them.
+## How does the Power Model Work?
+
+The Power Model estimates the power-system costs for each location in a network design. It produces separate capital expenditure (CapEx) and lifetime mains-electricity operating expenditure (OpEx) estimates; together, these are the power component of the solution's total cost of ownership over the selected system life. The model does not automatically choose a power system: select the option that best describes each location, then compare the resulting costs and assumptions.
+
+The model uses the electrical load calculated for the location, the selected system life, and the power, solar, battery, and charger/inverter settings. The mains installation cost, mains electricity price, solar cost, battery cost, charger/inverter base and variable costs, solar efficiency, battery depth of discharge, solar derating, and battery-age derating can all be adjusted in Expert Options. The defaults are intended as practical starting estimates, not quotations for a specific installation.
+
+### Location-specific solar and climate data
+
+Climate inputs are location-specific. The model rounds the latitude and longitude supplied for a location to two decimal places and looks for a complete record for that coordinate pair in the `Solar_cache` table. A valid cache record contains minimum solar resource, maximum and annual no-sun days, and average, minimum, and maximum temperatures. The older country-centroid `SolarStats` lookup is no longer used by the Power Model.
+
+When there is no complete cache record, the application requests a point climatology from NASA's Prediction Of Worldwide Energy Resources (POWER) service, then stores the derived result for future requests at the same rounded coordinates. POWER provides long-term climatological data, rather than a short-term weather forecast. Its current documentation, data descriptions, and API guidance are available in the [NASA POWER documentation](https://power.larc.nasa.gov/docs/).
+
+The application requests the POWER temporal-climatology point data for tilted-surface solar irradiance, equivalent no-sun days, and temperature at 2 metres (`T2M`). It derives the values used by the model as follows:
+
+- **Minimum daily solar resource (`min_sun`)** is the lowest valid monthly value in POWER's latitude-tilted surface irradiance series, `SI_TILTED_AVG_LATITUDE`. This is deliberately conservative: solar array sizing uses the least productive month.
+- **Maximum no-sun days (`max_no_sun_days`)** is the largest monthly value in `EQUIV_NO_SUN_CONSEC_07`. It represents the worst equivalent no-sun period in a seven-day window in the climatology.
+- **Annual no-sun days (`annual_no_sun_days`)** is a conservative estimate for hybrid systems. The model multiplies each monthly `EQUIV_NO_SUN_CONSEC_07` value by 4.3 and sums the twelve products.
+- **Average temperature (`avg_temp`)** comes from `T2M`'s annual (`ANN`) value. If that value is POWER's missing-data marker (`-999`), the model averages the valid monthly temperatures only when at least ten months are available.
+- **Minimum and maximum temperature** are the lowest and highest valid monthly `T2M` values. The minimum is used for battery cold derating; the other values are retained in the cache for a complete climate record.
+
+POWER's `-999` fill values and malformed or incomplete responses are not used. If the service cannot provide enough valid data, the application/API returns a 502 response with the detail: `The NSAS POWER service returned incomplete or invalid data.`
+
+### Power-system options
+
+| Selected system | Battery autonomy used by the model | Mains-power treatment |
+| --- | --- | --- |
+| **Reliable mains** | The configurable reliable-power outage duration (`power_reliable_hours`) | Assumes mains energy is used throughout the system life. |
+| **Intermittent mains** | The configurable intermittent-power outage duration (`power_intermittent_hours`) | Assumes mains energy is used throughout the system life, with battery capacity covering the configured outages. |
+| **Hybrid solar and mains** | The configurable hybrid autonomy duration (`power_hybrid_hours`) | Adds solar generation and uses annual no-sun days to estimate the days on which mains power is needed. |
+| **Off-grid solar** | `max_no_sun_days × 24` hours | Uses no mains installation or mains-energy OpEx. |
+
+Reliable and intermittent mains systems include a battery to cover their configured outage period, a charger/inverter, the mains installation cost, and lifetime mains electricity. Hybrid systems combine solar, batteries, a charger/inverter, and a mains connection. The solar array is sized from the worst monthly solar resource, while annual no-sun days determine the modelled lifetime mains-energy cost. Off-grid solar systems size battery autonomy for the worst no-sun period and have no mains-energy cost.
+
+### Battery, solar, and charger assumptions
+
+For systems with a battery, the model starts with the location's electrical load, the applicable autonomy period, and the configured depth of discharge. It then increases the requirement for battery-age derating over the full system life and applies a temperature-based cold derating using the location's coldest valid monthly `T2M` value. Lithium-ion batteries lose usable capacity as they age, and cold temperatures reduce the energy they can store, so both adjustments increase the installed battery capacity required to meet the same load.
+
+For solar and hybrid systems, the model sizes panel area from the required daily energy and the worst monthly solar resource. It applies the configured panel efficiency and solar derating over the system life. Panel generation capacity is calculated using a peak irradiance assumption of 1,350 watts per square metre, and panel cost is based on the configured local cost per watt. Charger/inverter cost consists of a base cost plus a variable cost: it scales with load for mains systems and with calculated solar-panel capacity for solar and hybrid systems.
+
+The model reports the calculated battery, charger/inverter, and solar cost components as well as the CapEx and OpEx results. In the current implementation, off-grid `power_capex` includes the calculated solar cost. For hybrid systems, `solar_cost` is calculated and reported separately, while `power_capex` currently includes battery, charger/inverter, and mains-installation costs; account for the separate solar component when interpreting a hybrid total.
+
+### Important limitations
+
+This is a planning model, not a detailed electrical-system design. It uses long-term monthly climatology and conservative worst-month/worst-period assumptions. It does not model local shading, terrain effects on irradiation, daily battery cycling, panel orientation and soiling, or seasonal operation in intermittent supply situations. These factors can materially change the best design, particularly at high and low latitudes. Use a site survey, local energy data, and a detailed engineering design before procurement or construction.
