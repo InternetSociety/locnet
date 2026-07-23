@@ -28,6 +28,11 @@ export const Header = () => {
               Documentation
             </IframeModalButton>
           </li>
+          <li>
+            <IframeModalButton url="/faq" dialogHeader="FAQ">
+              FAQ
+            </IframeModalButton>
+          </li>
           <ModelFileControls />
         </ul>
       </nav>

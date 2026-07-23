@@ -92,7 +92,9 @@ async def spa_post_handler(model_query: ModelQuery):
 
 
 @app.get("/documentation", response_class=HTMLResponse, include_in_schema=False)
-async def documentation_page(request: Request, lang: str = 'en'):
+async def documentation_page(
+    request: Request, lang: str = 'en', embedded: bool = Query(False)
+):
     try:
         # Get the UI text for the selected language
         text_data = get_text()
@@ -104,6 +106,7 @@ async def documentation_page(request: Request, lang: str = 'en'):
                                          {"request": request,
                                           "text": selected_text,
                                           "selected_language": lang,
+                                          "embedded": embedded,
                                           "documentation_content": documentation_content}
                                          )
     except Exception as e:
@@ -112,7 +115,7 @@ async def documentation_page(request: Request, lang: str = 'en'):
 
 
 @app.get("/qsg", response_class=HTMLResponse, include_in_schema=False)
-async def qsg_page(request: Request, lang: str = 'en'):
+async def qsg_page(request: Request, lang: str = 'en', embedded: bool = Query(False)):
     try:
         # Get the UI text for the selected language
         text_data = get_text()
@@ -124,8 +127,30 @@ async def qsg_page(request: Request, lang: str = 'en'):
                                          {"request": request,
                                           "text": selected_text,
                                           "selected_language": lang,
+                                          "embedded": embedded,
                                           "qsg_content": qsg_content}
                                          )
     except Exception as e:
         logging.error(f"Failed to load Quick Start Guide: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to load Quick Start Guide: {str(e)}")
+
+
+@app.get("/faq", response_class=HTMLResponse, include_in_schema=False)
+async def faq_page(request: Request, lang: str = 'en', embedded: bool = Query(False)):
+    try:
+        # Get the UI text for the selected language
+        text_data = get_text()
+        selected_text = {item['element']: item[lang] for item in text_data}
+
+        faq_content = render_markdown_document("faq.md")
+
+        return templates.TemplateResponse("faq.html",
+                                          {"request": request,
+                                           "text": selected_text,
+                                           "selected_language": lang,
+                                           "embedded": embedded,
+                                           "faq_content": faq_content}
+                                          )
+    except Exception as e:
+        logging.error(f"Failed to load FAQ: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load FAQ: {str(e)}")

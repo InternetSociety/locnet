@@ -36,7 +36,7 @@
   align-items: center;
   justify-content: center;
   padding: 0.5em 0.75em;
-  color: #058;
+  color: #000;
   background: var(--interactive-box-background);
   border: var(--interactive-box-toggle-selected-border);
   border-radius: 4px;

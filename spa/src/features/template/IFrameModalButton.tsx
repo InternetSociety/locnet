@@ -8,6 +8,7 @@ type Props = PropsWithChildren<{
 
 export const IframeModalButton = ({ url, dialogHeader, children }: Props) => {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const iframeUrl = `${url}${url.includes('?') ? '&' : '?'}embedded=true`;
 
   const openModal = (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
     e.preventDefault();
@@ -35,7 +36,7 @@ export const IframeModalButton = ({ url, dialogHeader, children }: Props) => {
       </a>
       <dialog ref={dialogRef} className={styles.dialog}>
         <div className={styles.dialogHeader}>{dialogHeader}</div>
-        <iframe src={url} className={styles.dialogIframe}></iframe>
+        <iframe src={iframeUrl} className={styles.dialogIframe}></iframe>
         <button
           type="button"
           className={styles.dialogClose}
