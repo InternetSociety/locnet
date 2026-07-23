@@ -1,8 +1,232 @@
 import logging
+import math
+from typing import Any
+
+import requests
+from fastapi import HTTPException
+
+from config import GRIST_API_KEY, GRIST_DOC_ID, GRIST_SERVER
 from library.helpers import fetch_grist_data
 from library.classes import PowerModelInput, PowerModelResult, PowerModelRow
 import numpy as np
 import pandas as pd
+
+
+NASA_POWER_URL = "https://power.larc.nasa.gov/api/temporal/climatology/point"
+NASA_POWER_ERROR_DETAIL = "The NSAS POWER service returned incomplete or invalid data."
+SOLAR_CACHE_TABLE = "Solar_cache"
+SOLAR_CACHE_DATA_COLUMNS = (
+    "min_sun",
+    "max_no_sun_days",
+    "annual_no_sun_days",
+    "avg_temp",
+    "min_temp",
+    "max_temp",
+)
+MONTHS = (
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC",
+)
+
+
+def _nasa_power_error() -> HTTPException:
+    return HTTPException(status_code=502, detail=NASA_POWER_ERROR_DETAIL)
+
+
+def _as_valid_nasa_value(value: Any) -> float | None:
+    """Return a finite NASA value, treating its -999 fill value as invalid."""
+    if isinstance(value, bool):
+        return None
+
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    if not math.isfinite(number) or number == -999:
+        return None
+    return number
+
+
+def _is_nasa_fill_value(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+
+    try:
+        return float(value) == -999
+    except (TypeError, ValueError):
+        return False
+
+
+def _valid_monthly_values(parameter: Any) -> list[float]:
+    if not isinstance(parameter, dict):
+        return []
+
+    values = []
+    for month in MONTHS:
+        value = _as_valid_nasa_value(parameter.get(month))
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def _complete_valid_monthly_values(parameter: Any) -> list[float] | None:
+    """Return all twelve monthly values, or None when a month is missing/invalid."""
+    if not isinstance(parameter, dict):
+        return None
+
+    values = []
+    for month in MONTHS:
+        value = _as_valid_nasa_value(parameter.get(month))
+        if value is None:
+            return None
+        values.append(value)
+    return values
+
+
+def _parse_solar_cache_record(record: Any) -> dict[str, float] | None:
+    """Accept a cache record only when every calculated statistic is usable."""
+    if not isinstance(record, dict):
+        return None
+
+    solar_stats = {}
+    for column in SOLAR_CACHE_DATA_COLUMNS:
+        value = _as_valid_nasa_value(record.get(column))
+        if value is None:
+            return None
+        solar_stats[column] = value
+    return solar_stats
+
+
+def _get_cached_solar_stats(latitude: float, longitude: float) -> dict[str, float] | None:
+    columns = ", ".join(("latitude", "longitude", *SOLAR_CACHE_DATA_COLUMNS))
+    sql_query = (
+        f"SELECT {columns} FROM {SOLAR_CACHE_TABLE} "
+        f"WHERE latitude = {latitude:.2f} AND longitude = {longitude:.2f}"
+    )
+
+    for record in fetch_grist_data(sql_query) or []:
+        solar_stats = _parse_solar_cache_record(record)
+        if solar_stats is not None:
+            return solar_stats
+    return None
+
+
+def _parse_nasa_solar_stats(payload: Any) -> dict[str, float]:
+    """Extract the statistics needed by the power model from NASA POWER JSON."""
+    if not isinstance(payload, dict):
+        raise _nasa_power_error()
+
+    properties = payload.get("properties")
+    if not isinstance(properties, dict):
+        raise _nasa_power_error()
+
+    parameters = properties.get("parameter")
+    if not isinstance(parameters, dict):
+        raise _nasa_power_error()
+
+    temperatures = parameters.get("T2M")
+    irradiance = parameters.get("SI_TILTED_AVG_LATITUDE")
+    no_sun_days = parameters.get("EQUIV_NO_SUN_CONSEC_07")
+    if not all(isinstance(parameter, dict) for parameter in (temperatures, irradiance, no_sun_days)):
+        raise _nasa_power_error()
+
+    temperature_values = _valid_monthly_values(temperatures)
+    if not temperature_values:
+        raise _nasa_power_error()
+
+    annual_temperature = _as_valid_nasa_value(temperatures.get("ANN"))
+    if annual_temperature is not None:
+        avg_temp = annual_temperature
+    elif _is_nasa_fill_value(temperatures.get("ANN")) and len(temperature_values) >= 10:
+        avg_temp = sum(temperature_values) / len(temperature_values)
+    else:
+        raise _nasa_power_error()
+
+    sun_values = _valid_monthly_values(irradiance)
+    if not sun_values:
+        raise _nasa_power_error()
+
+    no_sun_values = _complete_valid_monthly_values(no_sun_days)
+    if no_sun_values is None:
+        raise _nasa_power_error()
+
+    return {
+        "min_sun": round(min(sun_values),2),
+        "max_no_sun_days": round(max(no_sun_values),2),
+        "annual_no_sun_days": round(sum(value * 4.3 for value in no_sun_values),2),
+        "avg_temp": avg_temp,
+        "min_temp": min(temperature_values),
+        "max_temp": max(temperature_values),
+    }
+
+
+def _get_nasa_solar_stats(latitude: float, longitude: float) -> dict[str, float]:
+    url = (
+        f"{NASA_POWER_URL}?parameters=SI_EF_TILTED_SURFACE,EQUIV_NO_SUN_CONSEC_07,T2M"
+        f"&community=RE&longitude={longitude:.2f}&latitude={latitude:.2f}&format=JSON"
+    )
+
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        logging.warning("NASA POWER request failed for %s, %s: %s", latitude, longitude, exc)
+        raise _nasa_power_error() from exc
+
+    return _parse_nasa_solar_stats(payload)
+
+
+def _store_solar_cache(latitude: float, longitude: float, solar_stats: dict[str, float]) -> None:
+    """Persist a successful NASA response for future requests at these coordinates."""
+    url = f"{GRIST_SERVER}/api/docs/{GRIST_DOC_ID}/tables/{SOLAR_CACHE_TABLE}/records"
+    fields = {"latitude": latitude, "longitude": longitude, **solar_stats}
+    headers = {
+        "Authorization": f"Bearer {GRIST_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        response = requests.post(
+            url,
+            headers=headers,
+            json={"records": [{"fields": fields}]},
+            timeout=30,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        # NASA provided valid data, so a cache write failure should not prevent a
+        # user from receiving a power-model result. It will be retried next time.
+        logging.exception("Failed to store solar statistics in Solar_cache")
+
+
+def get_solar_statistics(latitude: float, longitude: float) -> dict[str, float]:
+    """Return cached solar statistics, retrieving and caching them on a miss."""
+    latitude = round(float(latitude), 2)
+    longitude = round(float(longitude), 2)
+    if not math.isfinite(latitude) or not math.isfinite(longitude):
+        raise ValueError("Latitude and longitude must be finite numbers.")
+
+    solar_stats = _get_cached_solar_stats(latitude, longitude)
+    if solar_stats is not None:
+        logging.info("Using cached solar statistics for %s, %s", latitude, longitude)
+        return solar_stats
+
+    logging.info("No complete solar-cache record for %s, %s; requesting NASA POWER", latitude, longitude)
+    solar_stats = _get_nasa_solar_stats(latitude, longitude)
+    _store_solar_cache(latitude, longitude, solar_stats)
+    return solar_stats
 
 
 def assign_users(df, total_potential_users):
@@ -84,8 +308,8 @@ def power_model(input_data: PowerModelInput) -> PowerModelResult:
 
     # Get variables from the input data
     location = input_data.location
-    latitude = input_data.latitude
-    longitude = input_data.longitude
+    latitude = round(float(input_data.latitude), 2)
+    longitude = round(float(input_data.longitude), 2)
     logging.info(f"lat & long: {latitude}, {longitude}")
     power_reliable_hours = input_data.power_reliable_hours
     power_required = input_data.power_required
@@ -105,34 +329,16 @@ def power_model(input_data: PowerModelInput) -> PowerModelResult:
     power_capex = 0
     power_opex = 0
 
-    query_name = "solarstats_query"
-    sql_query = """
-        SELECT
-        location, iso_2, latitude, longitude, min_sun, max_no_sun_days, annual_no_sun_days, avg_temp, min_temp, max_temp
-        FROM solarstats
-        where latitude = {}
-        and longitude = {}
-        """.format(latitude, longitude)
-
-    # Fetch Data
-    logging.info(f'running the db query')
-    try:
-        data = fetch_grist_data(sql_query)
-    except Exception as e:
-        logging.info(f"Failed to load {query_name} data: {str(e)}")
-        raise
-    if not data:
-        raise ValueError(f"No solar statistics found for latitude={latitude}, longitude={longitude}")
-
-    min_sun = float(data[0]["min_sun"])
-    max_no_sun_days = float(data[0]["max_no_sun_days"])
-    annual_no_sun_days = float(data[0]["annual_no_sun_days"])
-    min_temp = float(data[0]["min_temp"])
+    solar_stats = get_solar_statistics(latitude, longitude)
+    min_sun = solar_stats["min_sun"]
+    max_no_sun_days = solar_stats["max_no_sun_days"]
+    annual_no_sun_days = solar_stats["annual_no_sun_days"]
+    min_temp = solar_stats["min_temp"]
     solar_efficiency = input_data.solar_efficiency / 100
     solar_derating = input_data.solar_derating / 100
     battery_age_derating = input_data.battery_age_derating / 100
     battery_dod = input_data.battery_dod / 100
-    logging.info(f'extracted results from the db query')
+    logging.info("Extracted solar statistics")
 
     # Cold derating calculation
     def calculate_cold_derating(_min_temp):

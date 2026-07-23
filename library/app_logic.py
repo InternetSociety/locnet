@@ -239,8 +239,8 @@ def modeler(input_data: BuilderInput) -> ModelerOutput:
         power_type = location.power_type
         location_watts = 0 # Start a counter for all power use per location
         logging.info(f"power type for this location is {power_type}")
-        logging.info(f'Trying to get the centroid of our location')
-        latitude, longitude = get_centroid(iso_2)
+        latitude = location.latitude
+        longitude = location.longitude
         # Process network types and sectors (nt = network type) for each location
         # The zip function allows to read multiple lists in parallel
         # On a per-lcation basis, find the power type
