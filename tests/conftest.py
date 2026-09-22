@@ -2,6 +2,7 @@ import asyncio
 import shutil
 from pathlib import Path
 
+import pytest
 import pytest_asyncio
 from alembic import command
 from alembic.config import Config
@@ -11,6 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import settings
 from app.database import get_database_session
 from app.main import create_app
+
+
+@pytest.fixture(autouse=True)
+def disable_authentication_response_delay(monkeypatch):
+    """Keep the production timing floor from slowing the test suite."""
+    monkeypatch.setattr(
+        "app.security.AUTHENTICATION_MINIMUM_RESPONSE_SECONDS",
+        0,
+    )
 
 
 def upgrade_test_database(database_url: str) -> None:

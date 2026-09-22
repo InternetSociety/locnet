@@ -60,12 +60,27 @@ async def test_administrator_manages_users_and_api_access(
 async def test_normal_user_cannot_call_administrator_routes(
     client: AsyncClient,
     database_session: AsyncSession,
+    monkeypatch,
 ):
-    user = await UserService(UserRepository(database_session)).create_user(
+    service = UserService(UserRepository(database_session))
+    user = await service.create_user(
         "person@example.com",
         "normal user password",
     )
+    other_user = await service.create_user(
+        "other@example.com",
+        "another normal password",
+    )
     await login(client, user.email, "normal user password")
+
+    async def incorrectly_visible_users(_service, _current_user):
+        return [other_user]
+
+    monkeypatch.setattr(UserService, "visible_users", incorrectly_visible_users)
+    management = await client.get("/manage-users")
+    assert management.status_code == 200
+    assert user.email in management.text
+    assert other_user.email not in management.text
 
     response = await client.post(
         "/users/create",

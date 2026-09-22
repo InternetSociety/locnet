@@ -4,6 +4,7 @@ import type { LocNetModel } from './model';
 import type { BuilderInput } from './api-generated-client';
 import {
   GEOSPATIAL_API_ERROR_MESSAGE,
+  locnetBuilderInputToModel,
   locnetModelToBuilderInput,
   submitModel,
 } from './submit';
@@ -84,6 +85,32 @@ test('sends a null household override when modelled population is selected', () 
 
   expect(input.locations?.[0]?.households).toBeNull();
   expect(input.households_total).toBe(0);
+});
+
+test('loads each saved backhaul cost into its matching link', () => {
+  const model = locnetBuilderInputToModel({
+    locations: [
+      {
+        location_name: 'Location 1',
+        latitude: -36.85,
+        longitude: 174.76,
+        radius: 3,
+        households: 14,
+        network_type: [],
+        sectors: [],
+        network_links: [],
+        backhaul_links: ['Fibre', 'Satellite'],
+        backhaul_cost_base: [10, 20],
+        backhaul_cost_mbps: [0.5, 2],
+        power_type: 'power_mains_rel',
+      },
+    ],
+  } as unknown as BuilderInput);
+
+  expect(model.locations[0]?.backhaulLinks).toMatchObject([
+    { monthlyCharge: '10', trafficCost_USD: '0.5' },
+    { monthlyCharge: '20', trafficCost_USD: '2' },
+  ]);
 });
 
 test('returns the server error and completes a failed model submission', async () => {

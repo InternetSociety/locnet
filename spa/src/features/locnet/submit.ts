@@ -240,8 +240,9 @@ const locationDataToNetworkElement = (
         index,
         type: backhaul_link,
         name: '',
-        monthlyCharge: locationData.backhaul_cost_base?.toString() ?? '',
-        trafficCost_USD: locationData.backhaul_cost_mbps?.toString() ?? '',
+        monthlyCharge: locationData.backhaul_cost_base?.[index]?.toString() ?? '',
+        trafficCost_USD:
+          locationData.backhaul_cost_mbps?.[index]?.toString() ?? '',
       };
     },
   ),

@@ -32,6 +32,7 @@ async def _management_response(
     current_user,
     service,
     *,
+    users=None,
     error: str | None = None,
 ) -> HTMLResponse:
     csrf_token = request.cookies.get(settings.csrf_cookie_name) or new_csrf_token()
@@ -40,7 +41,9 @@ async def _management_response(
         name="manage_users.html",
         context={
             "current_user": current_user,
-            "users": await service.visible_users(current_user),
+            "users": users
+            if users is not None
+            else await service.visible_users(current_user),
             "csrf_token": csrf_token,
             "error": error,
         },
@@ -57,7 +60,17 @@ async def manage_users(
 ):
     if current_user is None:
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    return await _management_response(request, current_user, service)
+    users = (
+        await service.visible_users(current_user)
+        if current_user.is_admin
+        else [current_user]
+    )
+    return await _management_response(
+        request,
+        current_user,
+        service,
+        users=users,
+    )
 
 
 @router.post("/users/create", include_in_schema=False)

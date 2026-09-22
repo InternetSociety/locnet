@@ -1,10 +1,28 @@
+import asyncio
 import hmac
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from time import monotonic
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request, Response, status
 
 from app.config import settings
+
+AUTHENTICATION_MINIMUM_RESPONSE_SECONDS = 1.0
+
+
+@asynccontextmanager
+async def minimum_authentication_response_time() -> AsyncIterator[None]:
+    """Prevent authentication outcomes from returning observably early."""
+    started_at = monotonic()
+    try:
+        yield
+    finally:
+        remaining = AUTHENTICATION_MINIMUM_RESPONSE_SECONDS - (monotonic() - started_at)
+        if remaining > 0:
+            await asyncio.sleep(remaining)
 
 
 def new_csrf_token() -> str:

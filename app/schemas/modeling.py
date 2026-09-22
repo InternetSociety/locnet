@@ -143,12 +143,12 @@ class BuilderInput(BaseModel):
     system_life: int
     total_potential_users: Optional[float] = Field(default=None, ge=0)
     traffic_growth: float
-    users_per_household: float
+    users_per_household: float = Field(gt=0)
     year_1_traffic: int
 
     # Expanded Economic Model Fields
     households_total: Optional[int] = Field(default=None, ge=0)
-    hh_size: Optional[float] = Field(default=3)
+    hh_size: Optional[float] = Field(default=3, gt=0)
     pop_growth_rate: Optional[float] = Field(default=0.3)
     hh_income_week: float
     businesses: Optional[int] = Field(default=1)

@@ -15,6 +15,7 @@ from app.dependencies import (
 from app.repositories import DataRepository
 from app.security import (
     clear_authentication_cookies,
+    minimum_authentication_response_time,
     new_csrf_token,
     set_csrf_cookie,
     set_session_cookie,
@@ -99,24 +100,25 @@ async def sign_in(
     lang: str = Form("en"),
 ):
     verify_csrf_token(request, csrf_token)
-    try:
-        user = await service.authenticate_password(str(email), password)
-    except InvalidCredentials:
-        replacement_csrf_token = new_csrf_token()
-        return await _sign_in_response(
-            request,
-            repository,
-            csrf_token=replacement_csrf_token,
-            lang=lang,
-            error="Invalid email, password, or account status.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+    async with minimum_authentication_response_time():
+        try:
+            user = await service.authenticate_password(str(email), password)
+        except InvalidCredentials:
+            replacement_csrf_token = new_csrf_token()
+            return await _sign_in_response(
+                request,
+                repository,
+                csrf_token=replacement_csrf_token,
+                lang=lang,
+                error="Invalid email, password, or account status.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
-    session_token = build_session_token_service().create(user.email)
-    response = RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
-    set_session_cookie(response, session_token)
-    set_csrf_cookie(response, new_csrf_token())
-    return response
+        session_token = build_session_token_service().create(user.email)
+        response = RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+        set_session_cookie(response, session_token)
+        set_csrf_cookie(response, new_csrf_token())
+        return response
 
 
 @router.post("/logout", include_in_schema=False)
@@ -154,19 +156,20 @@ async def request_password_reset(
     csrf_token: str = Form(),
 ):
     verify_csrf_token(request, csrf_token)
-    await service.request_password_reset(str(email), sender)
-    replacement_csrf_token = new_csrf_token()
-    response = templates.TemplateResponse(
-        request=request,
-        name="forgot_password.html",
-        context=_template_context(
-            request,
-            csrf_token=replacement_csrf_token,
-            acknowledged=True,
-        ),
-    )
-    set_csrf_cookie(response, replacement_csrf_token)
-    return response
+    async with minimum_authentication_response_time():
+        await service.request_password_reset(str(email), sender)
+        replacement_csrf_token = new_csrf_token()
+        response = templates.TemplateResponse(
+            request=request,
+            name="forgot_password.html",
+            context=_template_context(
+                request,
+                csrf_token=replacement_csrf_token,
+                acknowledged=True,
+            ),
+        )
+        set_csrf_cookie(response, replacement_csrf_token)
+        return response
 
 
 @router.get("/reset-password", response_class=HTMLResponse, include_in_schema=False)
@@ -190,20 +193,23 @@ async def reset_password(
     csrf_token: str = Form(),
 ):
     verify_csrf_token(request, csrf_token)
-    try:
-        await service.reset_password(code, password)
-    except (InvalidResetCode, ValueError):
-        replacement_csrf_token = new_csrf_token()
-        response = templates.TemplateResponse(
-            request=request,
-            name="reset_password.html",
-            context=_template_context(
-                request,
-                csrf_token=replacement_csrf_token,
-                error="The reset code is invalid or expired.",
-            ),
-            status_code=status.HTTP_400_BAD_REQUEST,
+    async with minimum_authentication_response_time():
+        try:
+            await service.reset_password(code, password)
+        except (InvalidResetCode, ValueError):
+            replacement_csrf_token = new_csrf_token()
+            response = templates.TemplateResponse(
+                request=request,
+                name="reset_password.html",
+                context=_template_context(
+                    request,
+                    csrf_token=replacement_csrf_token,
+                    error="The reset code is invalid or expired.",
+                ),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+            set_csrf_cookie(response, replacement_csrf_token)
+            return response
+        return RedirectResponse(
+            "/login?reset=complete", status_code=status.HTTP_303_SEE_OTHER
         )
-        set_csrf_cookie(response, replacement_csrf_token)
-        return response
-    return RedirectResponse("/login?reset=complete", status_code=status.HTTP_303_SEE_OTHER)

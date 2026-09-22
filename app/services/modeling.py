@@ -69,6 +69,13 @@ def calculate_access_users_supported(
     )
 
 
+def require_positive_system_capex(system_capex: float) -> float:
+    """Reject a model whose calculated system capital cost is not positive."""
+    if system_capex <= 0:
+        raise ValueError("System CapEx must be greater than zero")
+    return system_capex
+
+
 def build_network_bom_dataframe(
     ldf: pd.DataFrame, mdf: pd.DataFrame, bdf: pd.DataFrame
 ) -> pd.DataFrame:
@@ -842,7 +849,9 @@ async def modeler(
     # Entire system cost includes connectivity, power system, and backhaul
 
     connectivity_capex = access_capex + backhaul_capex + midhaul_capex
-    system_capex = connectivity_capex + power_capex
+    system_capex = require_positive_system_capex(
+        connectivity_capex + power_capex
+    )
     system_opex = backhaul_opex + power_opex
 
     logging.info(f"Total system CapEx is {system_capex}")
