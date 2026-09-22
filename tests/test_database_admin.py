@@ -1,10 +1,14 @@
+import tempfile
+from pathlib import Path
+
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.repositories import UserRepository
 from app.services.users import UserService
-from database_admin.locnet_sqlite_web import _authorize
+from database_admin.locnet_sqlite_web import _authorize, _require_runtime_database
 
 AUTH_PATH = "/_internal/database-authorize"
 PROXY_HEADERS = {
@@ -102,3 +106,13 @@ def test_sqlite_web_authorizer_allows_application_data_but_not_credentials_or_dd
         _authorize(sqlite3.SQLITE_ALTER_TABLE, "main", "defaults")
         == sqlite3.SQLITE_DENY
     )
+
+
+def test_sqlite_web_refuses_to_create_a_missing_runtime_database():
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        database_path = Path(temporary_directory) / "app.db"
+
+        with pytest.raises(FileNotFoundError, match="Runtime database not found"):
+            _require_runtime_database(database_path)
+
+        assert not database_path.exists()

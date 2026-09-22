@@ -73,6 +73,7 @@ BLOCKED_ACTIONS = {
     sqlite3.SQLITE_REINDEX,
 }
 ORIGINAL_CONNECT = sqlite3.connect
+RUNTIME_DATABASE_PATH = Path("/app/runtime/app.db")
 
 
 def _table_is_allowed(table: str | None) -> bool:
@@ -108,7 +109,14 @@ def _restricted_connect(*args: object, **kwargs: object) -> sqlite3.Connection:
     return connection
 
 
+def _require_runtime_database(database_path: Path) -> None:
+    """Refuse to create a database before application bootstrap completes."""
+    if not database_path.is_file():
+        raise FileNotFoundError(f"Runtime database not found: {database_path}")
+
+
 def main() -> None:
+    _require_runtime_database(RUNTIME_DATABASE_PATH)
     sqlite3.connect = _restricted_connect  # type: ignore[assignment]
     from flask import abort, request
     from sqlite_web import sqlite_web
@@ -147,7 +155,7 @@ def main() -> None:
     sqlite_web.app.jinja_loader.searchpath.insert(0, str(Path("/opt/locnet/templates")))
     sys.argv = [
         "sqlite_web",
-        "/app/runtime/app.db",
+        str(RUNTIME_DATABASE_PATH),
         "--host=0.0.0.0",
         "--port=8080",
         "--no-browser",

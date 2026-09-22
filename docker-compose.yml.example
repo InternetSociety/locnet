@@ -27,6 +27,9 @@ services:
     build:
       context: ./database_admin
     restart: always
+    depends_on:
+      web-locnet:
+        condition: service_healthy
     volumes:
       - ./runtime:/app/runtime:rw
 
@@ -34,8 +37,10 @@ services:
     image: nginx:1.27.4-alpine
     restart: always
     depends_on:
-      - web-locnet
-      - sqlite-web
+      web-locnet:
+        condition: service_healthy
+      sqlite-web:
+        condition: service_started
     ports:
       - "8000:80"
     volumes:
