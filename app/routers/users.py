@@ -21,7 +21,6 @@ from app.services.users import (
     UserNotFound,
 )
 
-
 router = APIRouter()
 templates = Jinja2Templates(
     directory=Path(__file__).resolve().parents[1] / "templates"
@@ -57,7 +56,7 @@ async def manage_users(
     service: UserServiceDependency,
 ):
     if current_user is None:
-        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     return await _management_response(request, current_user, service)
 
 

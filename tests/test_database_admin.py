@@ -15,7 +15,7 @@ PROXY_HEADERS = {
 
 
 async def _sign_in(client: AsyncClient, email: str, password: str) -> None:
-    page = await client.get("/")
+    page = await client.get("/login")
     response = await client.post(
         "/login",
         data={

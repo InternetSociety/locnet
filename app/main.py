@@ -1,30 +1,31 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from html import escape
 from pathlib import Path
 from xml.etree.ElementTree import Element, SubElement
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from markdown import markdown
 from markdown.extensions import Extension
 from markdown.treeprocessors import Treeprocessor
 from pydantic import BaseModel
-from app.database import engine
+
 from app.config import settings
+from app.database import engine
 from app.dependencies import (
-    ActiveSessionUser,
     CurrentSessionUser,
     DataRepositoryDependency,
+    get_current_api_principal,
 )
 from app.error_handlers import user_service_error_handler
-from app.routers import auth, database_admin, users
-from app.security import require_api_csrf
-from app.routers import lookups
+from app.routers import auth, database_admin, lookups, users
 from app.routers.builder import router as builder_router
+from app.security import new_csrf_token, require_api_csrf, set_csrf_cookie
 from app.services.reference_data import (
     get_backhaul,
     get_countries,
@@ -40,8 +41,6 @@ from app.services.reference_data import (
     get_towers,
 )
 from app.services.users import UserServiceError
-import logging
-
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 DOCUMENTS_DIRECTORY = REPOSITORY_ROOT / "docs"
@@ -114,7 +113,7 @@ ui_router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
 spaTemplates = Jinja2Templates(directory=REPOSITORY_ROOT / "spa/dist")
 
-@ui_router.get("/app", response_class=HTMLResponse, include_in_schema=False)
+@ui_router.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def get_spa(
     request: Request,
     repository: DataRepositoryDependency,
@@ -122,8 +121,6 @@ async def get_spa(
     lang: str = 'en',
     ajax: bool = Query(False),
 ):
-    if current_user is None:
-        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
     try:
         # Get the countries data
         country_data = await get_countries(repository)
@@ -147,7 +144,8 @@ async def get_spa(
 
         example_filenames = list_example_filenames(EXAMPLES_DIRECTORY)
 
-        return spaTemplates.TemplateResponse(
+        csrf_token = request.cookies.get(settings.csrf_cookie_name) or new_csrf_token()
+        response = spaTemplates.TemplateResponse(
             request=request,
             name="index.html",
             context={
@@ -165,17 +163,29 @@ async def get_spa(
                 "tower_details": tower_details,
                 "tech_data": tech_data,
                 "paf_facilities_charge": paf_facilities_charge,
-                "current_user": {
-                    "email": current_user.email,
-                    "is_admin": current_user.is_admin,
-                    "api_access_enabled": current_user.api_access_enabled,
-                },
-                "csrf_token": request.cookies.get(settings.csrf_cookie_name, ""),
+                "current_user": (
+                    {
+                        "email": current_user.email,
+                        "is_admin": current_user.is_admin,
+                        "api_access_enabled": current_user.api_access_enabled,
+                    }
+                    if current_user is not None
+                    else None
+                ),
+                "csrf_token": csrf_token,
             },
         )
+        if settings.csrf_cookie_name not in request.cookies:
+            set_csrf_cookie(response, csrf_token)
+        return response
     except Exception:
         logging.exception("Failed to load application data")
         raise HTTPException(status_code=500, detail="Failed to load application data")
+
+
+@ui_router.get("/app", include_in_schema=False)
+async def legacy_application_route():
+    return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
 
 class ModelQuery(BaseModel):
     iso_3: str
@@ -188,7 +198,6 @@ class ModelQuery(BaseModel):
 )
 async def spa_post_handler(
     model_query: ModelQuery,
-    _current_user: ActiveSessionUser,
 ):
     return JSONResponse({"done": True})
 
@@ -218,7 +227,7 @@ async def documentation_page(
                 "text": selected_text,
                 "selected_language": lang,
                 "embedded": embedded,
-                "back_href": "/app" if current_user else "/",
+                "back_href": "/",
                 "documentation_content": documentation_content,
             },
         )
@@ -249,7 +258,7 @@ async def qsg_page(
                 "text": selected_text,
                 "selected_language": lang,
                 "embedded": embedded,
-                "back_href": "/app" if current_user else "/",
+                "back_href": "/",
                 "qsg_content": qsg_content,
             },
         )
@@ -280,7 +289,7 @@ async def faq_page(
                 "text": selected_text,
                 "selected_language": lang,
                 "embedded": embedded,
-                "back_href": "/app" if current_user else "/",
+                "back_href": "/",
                 "faq_content": faq_content,
             },
         )
@@ -297,22 +306,26 @@ async def health_check():
 @ui_router.get("/docs", include_in_schema=False)
 async def api_documentation(request: Request, current_user: CurrentSessionUser):
     if current_user is None:
-        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
-    if current_user.is_admin or not current_user.api_access_enabled:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     swagger = get_swagger_ui_html(
         openapi_url="/openapi.json",
         title="Community Network Builder API",
     )
     csrf_token = escape(request.cookies.get(settings.csrf_cookie_name, ""))
     email = escape(current_user.email)
+    admin_link = ""
+    if current_user.is_admin:
+        admin_link = (
+            '<a href="/manage-users" style="color:#000;background:#fff;'
+            'border:1px solid #ccc;border-radius:4px;padding:.5em .75em;'
+            'text-decoration:none">Admin Panel</a>'
+        )
     navigation = (
         '<nav style="display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;'
         'background:#eee;color:#222;font-family:sans-serif">'
-        '<a href="/app" style="color:#222;text-decoration:none;font-size:1.25rem">'
+        '<a href="/" style="color:#222;text-decoration:none;font-size:1.25rem">'
         "Community Network Builder</a>"
-        '<a href="/manage-users" style="color:#000;background:#fff;border:1px solid #ccc;'
-        'border-radius:4px;padding:.5em .75em;text-decoration:none">Manage users</a>'
+        f"{admin_link}"
         f'<span style="margin-left:auto">{email}</span>'
         '<form method="post" action="/logout" style="margin:0">'
         f'<input type="hidden" name="csrf_token" value="{csrf_token}">'
@@ -330,9 +343,12 @@ async def protected_openapi(request: Request, current_user: CurrentSessionUser):
             status_code=status.HTTP_401_UNAUTHORIZED,
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if current_user.is_admin or not current_user.api_access_enabled:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     return JSONResponse(request.app.openapi())
+
+
+@ui_router.get("/robots.txt", include_in_schema=False)
+async def robots_txt() -> FileResponse:
+    return FileResponse(REPOSITORY_ROOT / "static" / "robots.txt", media_type="text/plain")
 
 
 def create_app() -> FastAPI:
@@ -360,8 +376,22 @@ def create_app() -> FastAPI:
         StaticFiles(directory=DOCUMENTS_DIRECTORY),
         name="documentation-assets",
     )
-    application.include_router(lookups.router)
-    application.include_router(builder_router)
+    api_dependencies = [Depends(get_current_api_principal)]
+    web_dependencies = [Depends(require_api_csrf)]
+    application.include_router(lookups.router, dependencies=api_dependencies)
+    application.include_router(builder_router, dependencies=api_dependencies)
+    application.include_router(
+        lookups.router,
+        prefix="/web",
+        include_in_schema=False,
+        dependencies=web_dependencies,
+    )
+    application.include_router(
+        builder_router,
+        prefix="/web",
+        include_in_schema=False,
+        dependencies=web_dependencies,
+    )
     application.include_router(auth.router)
     application.include_router(users.router)
     application.include_router(database_admin.router)

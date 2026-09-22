@@ -55,7 +55,7 @@ const getBoundsInner = async (
 
   try {
     const response = await fetch(
-      `/api/bounds/${encodeURIComponent(props.iso_3)}`,
+      `/web/api/bounds/${encodeURIComponent(props.iso_3)}`,
       { signal: boundsAbortController.signal },
     );
     if (!response.ok) {
@@ -81,7 +81,7 @@ export const getBounds = debouncePromise(getBoundsInner, API_DEBOUNCE_TIME_MS);
 export const validateBuilderInput = async (
   input: unknown,
 ): Promise<BuilderInput> => {
-  const response = await fetch('/api/modeler/validate', {
+  const response = await fetch('/web/api/modeler/validate', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

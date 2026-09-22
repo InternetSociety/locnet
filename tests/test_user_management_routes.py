@@ -7,7 +7,7 @@ from app.services.users import UserService
 
 
 async def login(client: AsyncClient, email: str, password: str):
-    page = await client.get("/")
+    page = await client.get("/login")
     return await client.post(
         "/login",
         data={

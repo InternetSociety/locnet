@@ -40,7 +40,9 @@ export const locNetFormResolver: LocNetFormValueResolver = ({
       // Load the country's map centroid and bounding box for the location picker
       immerForm.api.bounds = undefined;
       queueFormSideEffect('api.bounds', getBounds({ iso_3: newValue }));
-      immerForm.nodes[2].isLoading = true;
+      immerForm.nodes[3].isLoading = true;
+      immerForm.nodes[0].isOpen = false;
+      immerForm.nodes[0].isButtonVisible = true;
     } else {
       // pass
     }
@@ -83,14 +85,14 @@ export const locNetFormResolver: LocNetFormValueResolver = ({
   if (formPath === 'api.characteristics') {
     // Reveal form
     console.log('formPath was ', formPath);
-    immerForm.nodes[2].isLoading = false; // hide loading
-    immerForm.nodes[1].isInert = false; // show inert
+    immerForm.nodes[3].isLoading = false; // hide loading
+    immerForm.nodes[2].isInert = false; // show inert
 
-    immerForm.nodes[1].children[0].isOpen = true; // show disclosure
+    immerForm.nodes[2].children[0].isOpen = true; // show disclosure
   }
 
   if (formPath === 'api.modelerAPIOutput' && !!newValue) {
-    immerForm.nodes[2].isLoading = false;
+    immerForm.nodes[3].isLoading = false;
     immerMeta.value.isSubmitting = false;
     const { modelerAPIOutput } = immerForm.api;
     if (
@@ -100,7 +102,7 @@ export const locNetFormResolver: LocNetFormValueResolver = ({
     ) {
       // The error is displayed above the form by ModelSubmissionError.
     } else {
-      immerForm.nodes[3].isOpen = true;
+      immerForm.nodes[4].isOpen = true;
     }
   }
 
@@ -113,7 +115,7 @@ export const locNetFormResolver: LocNetFormValueResolver = ({
         ['FWA', 'Mobile'].includes(node.value ?? '') &&
         node.checked,
     );
-    immerForm.nodes[1].children[0].children[2].isInert =
+    immerForm.nodes[2].children[0].children[2].isInert =
       !shouldShowFrequenciesSelector;
 
     // Only show Public Access Facilities if they selected it
@@ -121,7 +123,7 @@ export const locNetFormResolver: LocNetFormValueResolver = ({
       (node) =>
         node.type === 'ToggleButton' && node.value === 'PAF' && node.checked,
     );
-    immerForm.nodes[1].children[0].children[3].isInert =
+    immerForm.nodes[2].children[0].children[3].isInert =
       !shouldShowPublicAccessFacilitiesSelector;
   }
 
@@ -139,7 +141,7 @@ export const locNetFormResolver: LocNetFormValueResolver = ({
   });
 
   const selectedFrequencies =
-    immerForm.nodes[1].children[0].children[2].children[0].children[0].children
+    immerForm.nodes[2].children[0].children[2].children[0].children[0].children
       ?.map((node) => {
         if (node.type !== 'ToggleButton') {
           return undefined;

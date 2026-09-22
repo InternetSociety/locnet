@@ -20,7 +20,7 @@ async def create_user(
 
 
 async def sign_in(client: AsyncClient, email: str = "person@example.com"):
-    page = await client.get("/")
+    page = await client.get("/login")
     csrf_token = page.cookies[settings.csrf_cookie_name]
     return await client.post(
         "/login",
@@ -32,19 +32,35 @@ async def sign_in(client: AsyncClient, email: str = "person@example.com"):
     )
 
 
-async def test_public_landing_page_has_introduction_resources_and_language_picker(
+async def test_public_home_page_is_the_application_and_does_not_advertise_login(
     client: AsyncClient,
 ):
     response = await client.get("/")
 
     assert response.status_code == 200
-    assert "helps you estimate and understand the cost" in response.text
-    assert 'href="/qsg?lang=en"' in response.text
-    assert 'href="/documentation?lang=en"' in response.text
-    assert 'href="/faq?lang=en"' in response.text
-    assert 'aria-label="Choose language"' in response.text
+    assert "Community Network Builder" in response.text
+    assert 'id="root"' in response.text
+    assert 'id="current_user"' in response.text
+    assert 'class="sign-in-panel"' not in response.text
+    assert 'href="/login"' not in response.text
+
+
+async def test_login_page_is_available_only_at_the_unlinked_route(client: AsyncClient):
+    response = await client.get("/login")
+
+    assert response.status_code == 200
     assert 'class="sign-in-panel"' in response.text
-    assert "bg-black" not in response.text
+    assert 'action="/login"' in response.text
+    assert '<meta name="robots" content="noindex, nofollow">' in response.text
+
+
+async def test_robots_txt_discourages_indexing_authentication_routes(client: AsyncClient):
+    response = await client.get("/robots.txt")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert "Disallow: /login" in response.text
+    assert "Disallow: /docs" in response.text
 
 
 async def test_public_resources_are_available_without_a_session(client: AsyncClient):
@@ -56,7 +72,7 @@ async def test_public_resources_are_available_without_a_session(client: AsyncCli
 
 
 async def test_landing_language_selection_is_preserved(client: AsyncClient):
-    response = await client.get("/?lang=es")
+    response = await client.get("/login?lang=es")
 
     assert response.status_code == 200
     assert '<option value="es" selected>Español</option>' in response.text
@@ -73,11 +89,11 @@ async def test_sign_in_sets_http_only_session_and_opens_the_spa(
     response = await sign_in(client)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/app"
+    assert response.headers["location"] == "/"
     session_cookie = response.cookies[settings.session_cookie_name]
     assert session_cookie
     assert "httponly" in response.headers["set-cookie"].lower()
-    spa = await client.get("/app")
+    spa = await client.get("/")
     assert spa.status_code == 200
     assert "Community Network Builder" in spa.text
 
@@ -87,7 +103,7 @@ async def test_invalid_sign_in_is_safe(
     database_session: AsyncSession,
 ):
     await create_user(database_session)
-    page = await client.get("/")
+    page = await client.get("/login")
     csrf_token = page.cookies[settings.csrf_cookie_name]
 
     response = await client.post(
@@ -104,7 +120,7 @@ async def test_invalid_sign_in_is_safe(
     assert settings.session_cookie_name not in response.cookies
 
 
-async def test_api_accepts_a_session_or_enabled_persistent_token(
+async def test_api_requires_an_enabled_persistent_token(
     client: AsyncClient,
     database_session: AsyncSession,
 ):
@@ -115,7 +131,7 @@ async def test_api_accepts_a_session_or_enabled_persistent_token(
 
     await sign_in(client)
     session_response = await client.get("/api/defaults")
-    assert session_response.status_code == 200
+    assert session_response.status_code == 401
 
     service = UserService(UserRepository(database_session))
     issued = await service.enable_api_access(user.id)
@@ -127,39 +143,59 @@ async def test_api_accepts_a_session_or_enabled_persistent_token(
     assert token_response.status_code == 200
 
 
-async def test_cookie_authenticated_api_posts_require_csrf(
+async def test_public_browser_service_posts_require_csrf(
     client: AsyncClient,
     database_session: AsyncSession,
 ):
     await create_user(database_session)
-    await sign_in(client)
+    page = await client.get("/")
 
-    rejected = await client.post("/api/characteristics", json={"iso_3": "NZL"})
+    rejected = await client.post("/web/api/characteristics", json={"iso_3": "NZL"})
     assert rejected.status_code == 403
+    forged_bearer = await client.post(
+        "/web/api/characteristics",
+        json={"iso_3": "NZL"},
+        headers={"Authorization": "Bearer not-a-real-token"},
+    )
+    assert forged_bearer.status_code == 403
 
     accepted = await client.post(
-        "/api/characteristics",
+        "/web/api/characteristics",
         json={"iso_3": "NZL"},
         headers={
-            "X-CSRF-Token": client.cookies[settings.csrf_cookie_name],
+            "X-CSRF-Token": page.cookies[settings.csrf_cookie_name],
         },
     )
     assert accepted.status_code == 200
+    external_api = await client.post(
+        "/api/characteristics",
+        json={"iso_3": "NZL"},
+        headers={"X-CSRF-Token": page.cookies[settings.csrf_cookie_name]},
+    )
+    assert external_api.status_code == 401
 
 
-async def test_swagger_requires_an_api_enabled_normal_session(
+async def test_swagger_accepts_normal_and_administrator_sessions(
     client: AsyncClient,
     database_session: AsyncSession,
 ):
-    user = await create_user(database_session)
+    await create_user(database_session)
+    anonymous = await client.get("/docs")
+    assert anonymous.status_code == 303
+    assert anonymous.headers["location"] == "/login"
+
     await sign_in(client)
 
-    assert (await client.get("/docs")).status_code == 403
-    await UserService(UserRepository(database_session)).enable_api_access(user.id)
     assert (await client.get("/docs")).status_code == 200
     openapi = await client.get("/openapi.json")
     assert openapi.status_code == 200
     assert "HTTPBearer" in openapi.json()["components"]["securitySchemes"]
+
+    client.cookies.clear()
+    await create_user(database_session, email="admin@example.com", is_admin=True)
+    await sign_in(client, "admin@example.com")
+    assert (await client.get("/docs")).status_code == 200
+    assert (await client.get("/openapi.json")).status_code == 200
 
 
 async def test_logout_requires_csrf_and_deletes_the_session(
@@ -176,4 +212,7 @@ async def test_logout_requires_csrf_and_deletes_the_session(
     )
     assert response.status_code == 303
     assert response.headers["location"] == "/"
-    assert (await client.get("/app")).status_code == 303
+    legacy_app = await client.get("/app")
+    assert legacy_app.status_code == 303
+    assert legacy_app.headers["location"] == "/"
+    assert (await client.get("/")).status_code == 200

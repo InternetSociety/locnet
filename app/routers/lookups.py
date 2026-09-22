@@ -1,3 +1,18 @@
+import logging
+import re
+
+import httpx
+from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.templating import Jinja2Templates
+
+from app.config import (
+    MAP_PUBLIC_BASE_URL,
+    MAP_STYLE_PATH,
+    MAP_TILE_BASE_URL,
+    MAP_TILE_REFERER,
+    MAPTILER_API_KEY,
+)
+from app.dependencies import DataRepositoryDependency
 from app.schemas.modeling import (
     BoundsResponse,
     CharacteristicsRequest,
@@ -10,29 +25,8 @@ from app.services.reference_data import (
     get_defaults,
     get_site_text_by_language,
 )
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.templating import Jinja2Templates
-from typing import List
-import logging
-import re
-import httpx
-from fastapi import Body
-from app.dependencies import DataRepositoryDependency, get_current_api_principal
-from app.security import require_api_csrf
-from app.config import (
-    MAP_TILE_BASE_URL,
-    MAP_STYLE_PATH,
-    MAPTILER_API_KEY,
-    MAP_TILE_REFERER,
-    MAP_PUBLIC_BASE_URL,
-)
 
-router = APIRouter(
-    dependencies=[
-        Depends(get_current_api_principal),
-        Depends(require_api_csrf),
-    ]
-)
+router = APIRouter()
 templates = Jinja2Templates(directory="templates/")
 logging.basicConfig(level=logging.INFO)
 
@@ -403,7 +397,7 @@ async def get_site_text_by_lang(lang: str, repository: DataRepositoryDependency)
                         "up to the user interface to enforce minimums, maximums, and steps, because the model will "
                         "fail if vaules outside the minimum and maximum, or with too much precision are submitted.",
             tags=["API GET Endpoints"],
-            response_model=List[DefaultsDetail],
+            response_model=list[DefaultsDetail],
             include_in_schema=True,
             responses={
                 200: {
@@ -444,7 +438,7 @@ async def get_defaults_data(repository: DataRepositoryDependency):
              description="Supply an ISO3 country code and get the default model settings for that country. "
                          "This is done by fetching the default model settings and then modifying them with "
                          "country-specific data from the World Bank, ITU, etc.",
-             response_model=List[DefaultsDetail],
+             response_model=list[DefaultsDetail],
              tags=["API POST Endpoints"],
              include_in_schema=False,
              responses={
@@ -501,10 +495,11 @@ async def get_characteristics(
                         "server) used by the network location picker.",
             tags=["API GET Endpoints"],
             include_in_schema=False)
-async def get_map_config():
+async def get_map_config(request: Request):
     # The style is served through our own /api/tiles proxy so the browser never
     # talks to the upstream tile provider directly and the API key stays server-side.
-    return {"style_url": f"/api/tiles{MAP_STYLE_PATH}"}
+    route_prefix = "/web" if request.url.path.startswith("/web/") else ""
+    return {"style_url": f"{route_prefix}/api/tiles{MAP_STYLE_PATH}"}
 
 
 @router.get("/api/bounds/{iso_3}", summary="Country centroid and bounding box",
@@ -549,8 +544,10 @@ def _public_proxy_base(request: Request) -> str:
     falling back to the request's own scheme/host when they are absent (e.g. local
     development, where the page is served over plain HTTP without a tunnel). An
     explicit ``MAP_PUBLIC_BASE_URL`` in config always wins if provided."""
+    route_prefix = "/web" if request.url.path.startswith("/web/") else ""
+    proxy_path = f"{route_prefix}/api/tiles"
     if MAP_PUBLIC_BASE_URL:
-        return f"{MAP_PUBLIC_BASE_URL.rstrip('/')}/api/tiles"
+        return f"{MAP_PUBLIC_BASE_URL.rstrip('/')}{proxy_path}"
 
     forwarded_proto = request.headers.get("x-forwarded-proto")
     scheme = (
@@ -568,7 +565,7 @@ def _public_proxy_base(request: Request) -> str:
         else request.url.netloc
     )
 
-    return f"{scheme}://{host}/api/tiles"
+    return f"{scheme}://{host}{proxy_path}"
 
 
 def _rewrite_tile_urls(body: bytes, proxy_base: str) -> bytes:

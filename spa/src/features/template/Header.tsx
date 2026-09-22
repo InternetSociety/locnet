@@ -38,22 +38,24 @@ export const Header = () => {
             </IframeModalButton>
           </li>
           <ModelFileControls />
-          {currentUser.api_access_enabled && !currentUser.is_admin ? (
+          {currentUser && !currentUser.is_admin ? (
             <li>
-              <a href="/docs">API documentation</a>
+              <a href="/docs">API</a>
             </li>
           ) : null}
-          {currentUser.is_admin ? (
+          {currentUser?.is_admin ? (
             <li>
               <a href="/manage-users">Admin Panel</a>
             </li>
           ) : null}
-          <li>
-            <form method="post" action="/logout">
-              <input type="hidden" name="csrf_token" value={csrfToken} />
-              <button type="submit">Sign out ({currentUser.email})</button>
-            </form>
-          </li>
+          {currentUser ? (
+            <li>
+              <form method="post" action="/logout">
+                <input type="hidden" name="csrf_token" value={csrfToken} />
+                <button type="submit">Sign out ({currentUser.email})</button>
+              </form>
+            </li>
+          ) : null}
         </ul>
       </nav>
     </header>

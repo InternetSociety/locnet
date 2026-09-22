@@ -6,8 +6,8 @@ export type CurrentUser = {
   api_access_enabled: boolean;
 };
 
-export const getCurrentUser = (): CurrentUser =>
-  getDomJson('current_user') as CurrentUser;
+export const getCurrentUser = (): CurrentUser | null =>
+  getDomJson('current_user') as CurrentUser | null;
 
 export const getCsrfToken = (): string => getDomJson('csrf_token') as string;
 

@@ -26,8 +26,6 @@ def verify_csrf_token(request: Request, submitted_token: str | None) -> None:
 def require_api_csrf(request: Request) -> None:
     if request.method in {"GET", "HEAD", "OPTIONS"}:
         return
-    if request.headers.get("authorization") is not None:
-        return
     verify_csrf_token(request, request.headers.get("x-csrf-token"))
 
 

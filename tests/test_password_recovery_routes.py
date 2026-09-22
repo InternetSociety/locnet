@@ -61,7 +61,7 @@ async def test_password_reset_is_private_single_use_and_changes_the_password(
         },
     )
     assert reset.status_code == 303
-    assert reset.headers["location"] == "/?reset=complete"
+    assert reset.headers["location"] == "/login?reset=complete"
     await service.authenticate_password(user.email, "a different good password")
 
     second_page = await client.get("/reset-password")

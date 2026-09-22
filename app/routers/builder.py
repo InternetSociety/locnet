@@ -1,25 +1,19 @@
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 import logging
-from app.dependencies import DataRepositoryDependency, get_current_api_principal
+
+from fastapi import APIRouter, Body, HTTPException
+from fastapi.templating import Jinja2Templates
+
+from app.dependencies import DataRepositoryDependency
 from app.repositories import DataRepository
-from app.security import require_api_csrf
-from app.services.reference_data import get_text
-from app.services.modeling import modeler
-from app.schemas.modeling import BuilderInput, ModelerOutput, ModelerAPIOutput
+from app.schemas.modeling import BuilderInput, ModelerAPIOutput, ModelerOutput
 from app.services.geospatial import (
     GEOSPATIAL_API_ERROR_DETAIL,
     GeospatialConfigurationError,
     GeospatialServiceError,
 )
+from app.services.modeling import modeler
 
-router = APIRouter(
-    dependencies=[
-        Depends(get_current_api_principal),
-        Depends(require_api_csrf),
-    ]
-)
+router = APIRouter()
 
 # Set up templates directory
 templates = Jinja2Templates(directory="templates")
