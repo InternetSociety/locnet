@@ -1,4 +1,5 @@
-import { ApiClient, type BuilderInput } from './api-generated-client';
+import type { BuilderInput } from './api-generated-client';
+import { AuthenticatedApiClient } from '../auth/apiClient';
 import type { SubmitHandler } from '../form/useStaticFormTs';
 import type { EditableLocNetForm } from './formData';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../form/NodeTypes/NetworkElements.utils';
 import type { NetworkElement } from '../form/NodeTypes/NetworkElements';
 import { generateRandomKey } from '../form/key';
+import { authenticatedHeaders } from '../auth/session';
 
 declare global {
   interface Window {
@@ -59,7 +61,7 @@ export const useLocNetServerSubmit = () => {
 export const submitModel = async (
   builderInput: BuilderInput,
 ): Promise<EditableLocNetForm['api']['modelerAPIOutput']> => {
-  const api = new ApiClient();
+  const api = new AuthenticatedApiClient({ headers: authenticatedHeaders() });
   try {
     const modelResult =
       await api.apiPOSTEndpoints.modelerApiApiModelerPost(builderInput);

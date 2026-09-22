@@ -23,3 +23,15 @@ test('Form data exists', async () => {
   // this is a trivial test, and the real test is the TypeScript
   expect(editingTest).toBeTruthy();
 });
+
+test('starts with the introduction followed by country selection', () => {
+  expect(locNetForm.nodes[0]).toMatchObject({
+    type: 'Disclosure',
+    labelIntlId: 'introduction',
+    children: [{ type: 'HTML', intlId: 'welcome' }],
+  });
+  expect(locNetForm.nodes[1]).toMatchObject({
+    type: 'CountriesDropdown',
+    labelIntlId: 'sel_country',
+  });
+});

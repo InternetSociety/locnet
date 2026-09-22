@@ -3,8 +3,12 @@ import styles from './Header.module.css';
 import { IframeModalButton } from './IFrameModalButton';
 import { LanguagePicker } from './LanguagePicker';
 import { ModelFileControls } from '../locnet/ModelFileControls';
+import { getCsrfToken, getCurrentUser } from '../auth/session';
 
 export const Header = () => {
+  const currentUser = getCurrentUser();
+  const csrfToken = getCsrfToken();
+
   return (
     <header>
       <nav className={styles.topNav}>
@@ -34,6 +38,24 @@ export const Header = () => {
             </IframeModalButton>
           </li>
           <ModelFileControls />
+          {currentUser && !currentUser.is_admin ? (
+            <li>
+              <a href="/docs">API</a>
+            </li>
+          ) : null}
+          {currentUser?.is_admin ? (
+            <li>
+              <a href="/manage-users">Admin Panel</a>
+            </li>
+          ) : null}
+          {currentUser ? (
+            <li>
+              <form method="post" action="/logout">
+                <input type="hidden" name="csrf_token" value={csrfToken} />
+                <button type="submit">Sign out ({currentUser.email})</button>
+              </form>
+            </li>
+          ) : null}
         </ul>
       </nav>
     </header>

@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /docs
+Disallow: /openapi.json
+Disallow: /manage-users
+Disallow: /admin/

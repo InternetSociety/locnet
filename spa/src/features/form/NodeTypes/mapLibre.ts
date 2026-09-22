@@ -7,13 +7,13 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 // worker entry emits it (and its dependencies) and gives MapLibre a valid URL.
 setWorkerUrl(mapLibreWorkerUrl);
 
-// The style URL is provided by the backend (see /api/map_config) so the tile
+// The style URL is provided by the browser-service route so the tile
 // provider and its API key stay server-side. Cache the lookup for the session.
 let mapStyleUrlPromise: Promise<string> | undefined;
 
 export const getMapStyleUrl = (): Promise<string> => {
   if (!mapStyleUrlPromise) {
-    mapStyleUrlPromise = fetch('/api/map_config')
+    mapStyleUrlPromise = fetch('/web/api/map_config')
       .then((response) => {
         if (!response.ok) {
           throw new Error(`Map configuration returned HTTP ${response.status}`);
