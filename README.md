@@ -216,4 +216,4 @@ The Playwright service starts an isolated application on port 8011. It uses disp
 - © 2024–2026 APC, SKC, Telco2, ISOC and contributors. See repository's LICENSE file for details.
 
 ## Maintainer and support
-- For access to the menu/lookup API and general support, please contact the project maintainer.
+- For general support, please join the [Community Network Builder Mailing list](https://lists.apc.org/mailman/listinfo/cn-network-builder)
