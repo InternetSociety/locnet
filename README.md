@@ -35,6 +35,22 @@
 - Coverage and population modelling uses the GLO-30 viewshed, ESA WorldCover, and WorldPop services.
 - Documentation/QSG content is now in git and is rendered into `/documentation` and `/qsg` respectively.
 
+### Required external APIs
+
+The application requires all three APIs below and valid bearer tokens for them. The network model does not function if an API is unavailable or incorrectly configured.
+
+#### GLO-30
+
+[GLO-30](https://github.com/InternetSociety/glo30) supplies viewsheds from the Copernicus GLO-30 digital elevation model. The application uses each viewshed to calculate the visible radio-coverage area from a tower.
+
+#### ESA WorldCover
+
+[ESA WorldCover](https://github.com/InternetSociety/esawc) supplies land-cover fractions for a coverage area. The application uses its tree-cover and mangrove fractions to estimate vegetation loss and reduce the calculated radio range.
+
+#### WorldPop
+
+[WorldPop](https://github.com/InternetSociety/wpopapi) estimates the population inside a coverage area for a selected country. The application uses this estimate when a user does not supply a household-count override for a location.
+
 ## Architecture at a glance
 - Single repo with a Python FastAPI backend and a static SPA frontend.
 - Backend mounts static directories and serves:
