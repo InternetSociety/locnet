@@ -23,7 +23,6 @@ from app.security import (
 from app.services.reference_data import get_site_text_by_language
 from app.services.users import InvalidCredentials, InvalidResetCode
 
-
 router = APIRouter()
 templates = Jinja2Templates(
     directory=Path(__file__).resolve().parents[1] / "templates"
@@ -40,7 +39,7 @@ def _landing_language(lang: str) -> str:
     return normalized if normalized in LANDING_LANGUAGES else "en"
 
 
-async def _landing_response(
+async def _sign_in_response(
     request: Request,
     repository: DataRepository,
     *,
@@ -70,7 +69,7 @@ async def _landing_response(
     return response
 
 
-@router.get("/", response_class=HTMLResponse, include_in_schema=False)
+@router.get("/login", response_class=HTMLResponse, include_in_schema=False)
 async def sign_in_page(
     request: Request,
     current_user: CurrentSessionUser,
@@ -78,9 +77,9 @@ async def sign_in_page(
     lang: str = Query("en"),
 ):
     if current_user is not None:
-        return RedirectResponse("/app", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
     csrf_token = new_csrf_token()
-    return await _landing_response(
+    return await _sign_in_response(
         request,
         repository,
         csrf_token=csrf_token,
@@ -104,7 +103,7 @@ async def sign_in(
         user = await service.authenticate_password(str(email), password)
     except InvalidCredentials:
         replacement_csrf_token = new_csrf_token()
-        return await _landing_response(
+        return await _sign_in_response(
             request,
             repository,
             csrf_token=replacement_csrf_token,
@@ -114,7 +113,7 @@ async def sign_in(
         )
 
     session_token = build_session_token_service().create(user.email)
-    response = RedirectResponse("/app", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
     set_session_cookie(response, session_token)
     set_csrf_cookie(response, new_csrf_token())
     return response
@@ -207,4 +206,4 @@ async def reset_password(
         )
         set_csrf_cookie(response, replacement_csrf_token)
         return response
-    return RedirectResponse("/?reset=complete", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/login?reset=complete", status_code=status.HTTP_303_SEE_OTHER)

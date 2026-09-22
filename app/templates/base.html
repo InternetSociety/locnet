@@ -109,18 +109,18 @@
     <div class="app-shell">
       <header class="app-header">
         <div class="app-title-row">
-          <a class="app-title" href="{% if current_user %}/app{% else %}/{% endif %}">Community Network Builder</a>
+          <a class="app-title" href="/">Community Network Builder</a>
           {% block header_tools %}{% endblock %}
         </div>
         {% if current_user %}
           <nav class="app-navigation" aria-label="Account navigation">
-            {% if current_user.api_access_enabled and not current_user.is_admin %}
-              <a class="app-button" href="/docs">API documentation</a>
+            {% if not current_user.is_admin %}
+              <a class="app-button" href="/docs">API</a>
             {% endif %}
             {% if current_user.is_admin %}
+              <a class="app-button" href="/manage-users">Admin Panel</a>
               <a class="app-button" href="/admin/database/">Database Admin</a>
             {% endif %}
-            <a class="app-button" href="/manage-users">Manage users</a>
             <span class="app-user">{{ current_user.email }}</span>
             <form method="post" action="/logout" class="m-0">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

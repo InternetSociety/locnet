@@ -47,10 +47,10 @@ export const useLocNetServerSubmit = () => {
         return;
       }
 
-      immerForm.nodes[1].children[0].isButtonVisible = true;
-      immerForm.nodes[1].children[0].isOpen = false;
-      immerForm.nodes[2].isLoading = true;
-      immerForm.nodes[3].isOpen = false;
+      immerForm.nodes[2].children[0].isButtonVisible = true;
+      immerForm.nodes[2].children[0].isOpen = false;
+      immerForm.nodes[3].isLoading = true;
+      immerForm.nodes[4].isOpen = false;
       immerForm.api.modelerAPIOutput = undefined;
       queueFormSideEffect('api.modelerAPIOutput', submitModel(builderInput));
       window.scrollTo(0, 0);

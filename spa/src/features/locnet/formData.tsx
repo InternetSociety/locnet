@@ -19,6 +19,16 @@ type ApiError = {
 export const locNetForm = {
   nodes: [
     {
+      type: 'Disclosure',
+      labelIntlId: 'introduction',
+      children: [
+        {
+          type: 'HTML',
+          intlId: 'welcome',
+        },
+      ],
+    },
+    {
       type: 'CountriesDropdown',
       labelIntlId: 'sel_country',
       modelPath: 'iso_3',
@@ -226,9 +236,11 @@ export type EditableLocNetForm = MakeStaticFormTSValue<LocNetForm>;
 const locnetStaticFormValue = makeStaticFormTSValue(locNetForm);
 
 // Set runtime default states below, so that (eg) isOpen=true aren't hardcoded into LocNet form schema TypeScript type.
-locnetStaticFormValue.nodes[1].children[0].isButtonVisible = false;
-locnetStaticFormValue.nodes[1].isInert = true;
-locnetStaticFormValue.nodes[1].children[0].children[2].isInert = true;
-locnetStaticFormValue.nodes[3].isButtonVisible = false;
+locnetStaticFormValue.nodes[0].isButtonVisible = false;
+locnetStaticFormValue.nodes[0].isOpen = true;
+locnetStaticFormValue.nodes[2].children[0].isButtonVisible = false;
+locnetStaticFormValue.nodes[2].isInert = true;
+locnetStaticFormValue.nodes[2].children[0].children[2].isInert = true;
+locnetStaticFormValue.nodes[4].isButtonVisible = false;
 
 export { locnetStaticFormValue };

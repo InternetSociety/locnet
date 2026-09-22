@@ -73,8 +73,8 @@ docker compose run --rm test pytest
 
 Open in your browser:
 
-- Sign in: http://localhost:8000/
-- App: http://localhost:8000/app
+- App: http://localhost:8000/
+- Sign in (unlinked): http://localhost:8000/login
 - OpenAPI (Swagger UI): http://localhost:8000/docs
 - Quick Start Guide: http://localhost:8000/qsg
 - Documentation: http://localhost:8000/documentation
@@ -167,11 +167,11 @@ Production docs and quick start
 - Documentation: https://locnet.io/documentation
 
 ## API usage
-- The SPA sends its HTTP-only session cookie to `/api/*` routes.
+- The public SPA uses the separate `/web/api/*` browser-service routes.
 - An administrator can enable persistent API access for a normal user.
-- External clients send that token as `Authorization: Bearer TOKEN`.
+- Every `/api/*` request requires that token as `Authorization: Bearer TOKEN`.
 - The application stores only the token digest and shows the plain token once.
-- API-enabled normal users can open Swagger at `/docs` after they sign in.
+- Signed-in normal users and administrators can open Swagger at `/docs`.
 
 ## Playwright tests
 Playwright is a browser automation and end-to-end testing framework for web applications. It is useful for checking that the app behaves correctly in real browsers, with real user actions such as clicking, typing, selecting options, and waiting for UI updates. The official documentation is here: [Playwright docs](https://playwright.dev/).

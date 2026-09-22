@@ -107,8 +107,8 @@ The current approved patch versions are React and React DOM 19.2.8, TypeScript 5
 * Do not use global mutable state.
 * Do not use synchronous database drivers or blocking I/O in an async route.
 * Move necessary blocking file work to a thread with `asyncio.to_thread`.
-* The SPA is the authenticated application UI and is served from `/app`.
-* The SPA calls same-origin `/api` routes with the browser-session cookie.
+* The SPA is the public application UI and is served from `/`.
+* The SPA calls same-origin `/web/api` browser-service routes. These routes are excluded from OpenAPI and do not grant access to the external API.
 * The SPA must not read or store the session JWT or a persistent API token.
 * Client-side visibility rules improve usability but never replace server-side authorization.
 
@@ -152,13 +152,14 @@ Never return a raw ORM model or an untyped dictionary from an API route.
 
 | Method | Path | Access | Result |
 | --- | --- | --- | --- |
-| `GET` | `/` | Public | Sign-in page, or redirect an authenticated user to `/app`. |
+| `GET` | `/` | Public | React single-page application, with account controls only when a session is present. |
 | `GET` | `/health` | Public | Container health status. |
 | `GET` | `/static/*`, `/assets/*`, `/documentation-assets/*` | Public | Static application assets. |
-| `GET` | `/app` | Session user | React single-page application. |
-| `GET` | `/app/{path}` | Session user | React client-side route fallback when client-side routing is used. |
-| `POST` | `/login` | Public | Browser-session creation and redirect to `/app`. |
+| `GET` | `/app` | Public | Redirect to the canonical application route at `/`. |
+| `GET` | `/login` | Public | Unlinked sign-in page. |
+| `POST` | `/login` | Public | Browser-session creation and redirect to `/`. |
 | `POST` | `/logout` | Session user | Session deletion and redirect to `/`. |
+| `GET` | `/robots.txt` | Public | Crawler exclusions for authentication and administration routes. |
 | `GET` | `/forgot-password` | Public | Password-reset request page. |
 | `POST` | `/forgot-password` | Public | Create and email a password-reset code when the account is eligible. |
 | `GET` | `/reset-password` | Public | Form for a reset code and new password. |
@@ -166,8 +167,8 @@ Never return a raw ORM model or an untyped dictionary from an API route.
 | `GET` | `/documentation` | Public | Application documentation. |
 | `GET` | `/qsg` | Public | Quick-start guide. |
 | `GET` | `/faq` | Public | Frequently asked questions. |
-| `GET` | `/docs` | API-enabled normal session user | Authenticated Swagger UI. |
-| `GET` | `/openapi.json` | API-enabled normal session user | Protected OpenAPI document. |
+| `GET` | `/docs` | Active session user | Authenticated Swagger UI for normal users and administrators. |
+| `GET` | `/openapi.json` | Active session user | Protected OpenAPI document. |
 | `GET` | `/manage-users` | Active user | Own account or administrator account list. |
 | `POST` | `/users/create` | Administrator | User creation. |
 | `POST` | `/users/{user_id}/enable-api` | Administrator | Enable API access and issue the first persistent token. |
@@ -177,20 +178,24 @@ Never return a raw ORM model or an untyped dictionary from an API route.
 | `POST` | `/users/{user_id}/toggle-admin` | Administrator | Role change. |
 | `POST` | `/users/{user_id}/delete` | Administrator | User deletion. |
 | Any | `/admin/database/*` | Administrator session | Reverse-proxied sqlite-web editor for allowlisted application-data tables. |
-| Any | `/api/*` | Active session user or active API-enabled normal user's persistent token | Application API response. |
+| Any | `/api/*` | Active API-enabled normal user's persistent token | External application API response. |
+| Any | `/web/api/*` | Public | Browser application service response, excluded from OpenAPI. |
 
 Application API routes must use an `/api` prefix. Use `/api/v1` when external clients need a stable version.
 
-Session-cookie access to `/api/*` exists for the first-party SPA and is available to every active signed-in user. Direct API access uses `Authorization: Bearer TOKEN` and is available only to an active, non-administrator user whose API access is enabled. A server cannot prove that a cookie-authenticated request was initiated by the React code, so this credential boundary is the enforceable distinction.
+Every `/api/*` request uses `Authorization: Bearer TOKEN`. Session cookies are not API credentials. Persistent API access is available only to an active, non-administrator user whose API access is enabled. The public SPA uses separate `/web/api/*` routes because a server cannot prove that a cookie-less request was initiated by React. Those routes expose only the functionality already available through the public application and are not part of the external API contract.
 
 ### Page behavior
 
-* The public home page must show an email and password form.
+* The public home page must show the complete network-modeling application and no sign-in link or other indication that authentication is available.
+* Show the localized introductory text below the main menu with at least 1rem of vertical separation.
+* The unlinked `/login` page must show the email and password form.
 * The sign-in form must link to `/forgot-password`.
-* A successful sign-in must redirect to `/app` with HTTP 303.
-* An anonymous request for `/app` must redirect to `/` with HTTP 303.
-* The SPA must identify the current user and provide a Sign out control.
-* Show the Swagger link only to an API-enabled normal user.
+* A successful sign-in must redirect to `/` with HTTP 303.
+* `/app` must redirect to `/` with HTTP 303.
+* When a session is present, the SPA must identify the current user and provide a Sign out control.
+* Show an `API` link to `/docs` to each signed-in normal user.
+* Show an `Admin Panel` link to `/manage-users` only to a signed-in administrator.
 * Show a safe error for invalid credentials or an inactive account.
 * Do not expose whether an unknown email exists.
 * A password-reset request must always show the same acknowledgement, including for an
@@ -207,7 +212,7 @@ Session-cookie access to `/api/*` exists for the first-party SPA and is availabl
 
 `/admin/database/` is a same-origin, administrator-only sqlite-web interface.
 Nginx applies an internal FastAPI `auth_request` check to every editor request,
-including assets. Anonymous requests redirect to `/`; authenticated non-administrators
+including assets. Anonymous requests redirect to `/login`; authenticated non-administrators
 receive HTTP 403. Unsafe editor requests require a same-origin `Origin` or `Referer`.
 
 The editor receives the runtime SQLite bind mount but may browse and edit only its
@@ -219,10 +224,9 @@ Schema changes remain Alembic-only.
 ### Authenticated API documentation
 
 * Disable FastAPI's default public Swagger, ReDoc, and OpenAPI routes.
-* Supply protected `/docs` and `/openapi.json` routes for API-enabled normal users.
-* Redirect an anonymous `/docs` request to `/` with HTTP 303.
+* Supply protected `/docs` and `/openapi.json` routes for every active session user, including administrators.
+* Redirect an anonymous `/docs` request to `/login` with HTTP 303.
 * Return HTTP 401 for an anonymous `/openapi.json` request.
-* Return HTTP 403 when an authenticated administrator or an API-disabled user requests either resource.
 * Add the common application navigation to Swagger.
 
 ### Browser security
@@ -260,7 +264,7 @@ Create and change the user table only through Alembic migrations.
 ### Roles and visibility
 
 * An administrator manages users with an email, password, and browser-session JWT.
-* Every active user accesses the SPA and its same-origin API calls with a browser-session JWT.
+* Every visitor accesses the public SPA and its same-origin browser-service calls without authentication.
 * An API-enabled normal user can also access protected API routes with one persistent bearer token.
 * API access is disabled by default and an administrator turns it on or off through user management.
 * An administrator must not have API access enabled or a persistent bearer token.
@@ -306,7 +310,7 @@ password into the password-reset form.
 * After a successful reset, replace the password hash and clear both reset-code fields in the same
   transaction. Thus, the user cannot use the code again.
 * Return HTTP 400 with a generic invalid-code error for every failed code validation.
-* Redirect a successful reset to `/` with HTTP 303 and show a confirmation on the sign-in page.
+* Redirect a successful reset to `/login` with HTTP 303 and show a confirmation on the sign-in page.
 * Read SMTP enablement, host, port, and sender address from settings.
 
 ### Credential rules
@@ -321,9 +325,9 @@ The JWT must contain `sub`, `exp`, and a credential-type claim with the value `s
 Generate each persistent token with at least 256 bits of secure random input. `secrets.token_urlsafe(32)` is the reference generator. Store only the SHA-256 digest of the token.
 
 * UI routes authenticate only with the session cookie.
-* API routes read `Authorization: Bearer TOKEN` when that header is present and must not fall back to the session cookie after an invalid bearer credential.
+* API routes require `Authorization: Bearer TOKEN` and must never use the session cookie.
 * Resolve a bearer token by hashing it and finding an active, API-enabled, non-administrator user through the unique digest.
-* When an API request has no bearer header, authenticate it with the browser-session cookie for use by the SPA.
+* When an API request has no bearer header, return HTTP 401 with `WWW-Authenticate: Bearer`.
 * Never decode a bearer-header value as a JWT.
 * Accept only the configured JWT algorithm for the session cookie.
 * Reject an invalid, expired, or incorrectly typed session JWT.
@@ -337,13 +341,13 @@ Define these reusable dependencies in `app/dependencies.py`:
 
 * `get_current_session_user` resolves the session cookie and can return no user.
 * `get_current_active_session_user` requires an authenticated and active browser-session user.
-* `get_current_api_principal` resolves a persistent bearer token when present or otherwise requires an active browser-session user.
-* `get_current_api_enabled_session_user` requires an active, non-administrator session user with API access enabled; use it for Swagger and OpenAPI.
+* `get_current_api_principal` requires and resolves a persistent bearer token.
+* `get_current_active_session_user` protects Swagger and OpenAPI for both normal users and administrators.
 * `get_current_admin_user` requires an active administrator session.
 * `get_user_service` creates a service with the request repository and session.
 
 An anonymous API request must return HTTP 401 and `WWW-Authenticate: Bearer`.
-An anonymous UI request must redirect to `/`. A disabled or unauthorized account must receive HTTP 403.
+An anonymous protected UI request must redirect to `/login`. A disabled or unauthorized account must receive HTTP 403.
 
 ### Lifecycle rules
 
@@ -399,11 +403,12 @@ The test suite must cover these cases:
 * Password-reset delivery does not block the async event loop, and delivery failure does not reveal
   whether the account exists.
 * An inactive user cannot sign in or use the API.
-* An active browser session can authenticate an API request made by the SPA.
+* A browser session cannot authenticate an `/api/*` request.
+* The public SPA can complete its normal workflow through `/web/api/*` without authentication.
 * An enabled persistent token can authenticate an API request, while a disabled or replaced token cannot.
 * The application does not issue or accept a short-lived bearer JWT.
-* Anonymous users cannot access the SPA, Swagger, OpenAPI, or user management.
-* API-disabled users and administrators cannot access Swagger or OpenAPI.
+* Anonymous users can access the SPA but cannot access Swagger, OpenAPI, user management, or `/api/*`.
+* Active normal users and administrators can access Swagger and OpenAPI.
 * A non-administrator sees only their account and cannot call an administrator route.
 * An administrator can make each permitted lifecycle change.
 * Self-protection rules reject each prohibited lifecycle change.
@@ -433,7 +438,7 @@ Run all tests and checks through Docker Compose. The suite must run from a clean
 * Use Playwright web-first assertions and observable response or UI conditions.
 * Run Chromium on every change and Firefox in CI. WebKit may run as a scheduled compatibility check.
 * Retain traces, screenshots, and the HTML report for failed CI tests.
-* Browser tests must cover sign-in, sign-out, failed and inactive sign-in, password recovery, `/app` protection, SPA API use, Swagger and OpenAPI authorization, CSRF rejection, API enablement and revocation, role-based controls, and administrator lifecycle operations.
+* Browser tests must cover the anonymous SPA workflow, the unlinked sign-in route, sign-in, sign-out, failed and inactive sign-in, password recovery, Swagger and OpenAPI authorization, bearer-token enforcement, CSRF rejection, API enablement and revocation, role-based controls, and administrator lifecycle operations.
 
 ## Prohibited patterns
 

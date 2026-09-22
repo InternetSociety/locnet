@@ -2,6 +2,7 @@
 {% extends "base.html" %}
 {% block title %}Sign in | Community Network Builder{% endblock %}
 {% block head %}
+  <meta name="robots" content="noindex, nofollow">
   <style>
     .landing-language-label {
       display: flex;
@@ -41,7 +42,7 @@
   </style>
 {% endblock %}
 {% block header_tools %}
-  <form method="get" action="/">
+  <form method="get" action="/login">
     <label class="landing-language-label">
       <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 420 420" stroke="#000" fill="none" aria-hidden="true">
         <path stroke-width="26" d="M209,15a195,195 0 1,0 2,0z" />

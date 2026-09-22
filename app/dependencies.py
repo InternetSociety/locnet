@@ -16,7 +16,6 @@ from app.services.email import (
 )
 from app.services.users import InvalidCredentials
 
-
 DatabaseSession = Annotated[AsyncSession, Depends(get_database_session)]
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -99,43 +98,21 @@ ActiveSessionUser = Annotated[User, Depends(get_current_active_session_user)]
 
 
 async def get_current_api_principal(
-    request: Request,
     service: UserServiceDependency,
-    session_user: CurrentSessionUser,
     credentials: Annotated[
         HTTPAuthorizationCredentials | None,
         Depends(bearer_scheme),
     ],
 ) -> User:
-    authorization = request.headers.get("authorization")
-    if authorization is not None:
-        if credentials is None or credentials.scheme.lower() != "bearer":
-            raise _api_unauthorized()
-        try:
-            return await service.authenticate_api_token(credentials.credentials)
-        except InvalidCredentials as error:
-            raise _api_unauthorized() from error
-
-    if session_user is None:
+    if credentials is None or credentials.scheme.lower() != "bearer":
         raise _api_unauthorized()
-    return session_user
+    try:
+        return await service.authenticate_api_token(credentials.credentials)
+    except InvalidCredentials as error:
+        raise _api_unauthorized() from error
 
 
 ApiPrincipal = Annotated[User, Depends(get_current_api_principal)]
-
-
-async def get_current_api_enabled_session_user(
-    user: ActiveSessionUser,
-) -> User:
-    if user.is_admin or not user.api_access_enabled:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-    return user
-
-
-ApiEnabledSessionUser = Annotated[
-    User,
-    Depends(get_current_api_enabled_session_user),
-]
 
 
 async def get_current_admin_user(user: ActiveSessionUser) -> User:
