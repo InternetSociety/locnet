@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>LOCNET Database Administration</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/sqlbrowse.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/syntax-highlight.css') }}">
+    <style>
+      :root {
+        --locnet-background: #eee;
+        --locnet-surface: #fff;
+        --locnet-border: #ccc;
+        --locnet-focus: #efe;
+        --locnet-text: #222;
+        --locnet-link: #058;
+      }
+
+      body {
+        color: var(--locnet-text);
+        background: var(--locnet-background);
+        font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+      }
+
+      .container-fluid { max-width: 1440px; padding: 0 1rem 2rem; }
+      .locnet-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--locnet-border);
+      }
+      .locnet-title { margin: 0; font-size: 2rem; font-weight: 100; }
+      .locnet-subtitle { margin: .25rem 0 0; color: #555; }
+      .locnet-button, .btn-primary, .btn-secondary {
+        color: #000 !important;
+        background: var(--locnet-surface) !important;
+        border: 1px solid var(--locnet-border) !important;
+        border-radius: 4px;
+      }
+      .locnet-button:hover, .locnet-button:focus, .btn-primary:hover, .btn-secondary:hover,
+      .nav-pills .nav-link:hover, .nav-pills .nav-link:focus {
+        background: var(--locnet-focus) !important;
+      }
+      a { color: var(--locnet-link); }
+      .nav-pills .nav-link.active { background: var(--locnet-link); }
+      .nav-tabs .nav-link.active { background: var(--locnet-surface); }
+      #sidebar, #content { padding-top: 1.25rem; }
+      #sidebar { border-right: 1px solid var(--locnet-border); }
+      footer { color: #555; }
+      @media (max-width: 767px) {
+        .locnet-header { align-items: flex-start; flex-direction: column; }
+        #sidebar { border-right: 0; border-bottom: 1px solid var(--locnet-border); }
+      }
+    </style>
+    {% block extra_head %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/jquery-1.11.0.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>$(function() { App.initialize(); });</script>
+    {% block extra_scripts %}{% endblock %}
+  </head>
+  <body class="{% block body_class %}{% endblock %}">
+    <div class="container-fluid">
+      <header class="locnet-header">
+        <div>
+          <h1 class="locnet-title">LOCNET Database Administration</h1>
+          <p class="locnet-subtitle">Allowlisted application data editor</p>
+        </div>
+        <a class="btn locnet-button" href="/app">Return to Application</a>
+      </header>
+      <div class="row">
+        <aside class="col-md-3" id="sidebar">
+          {% block sidebar %}{% endblock %}
+        </aside>
+        <main class="col-md-9" id="content">
+          {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="alert alert-{{ category }} alert-dismissable">
+              <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+              <p>{{ message }}</p>
+            </div>
+          {% endfor %}
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+      <footer class="row"><div class="col-md-9 offset-md-3"><hr><p>LOCNET administrator database editor.</p></div></footer>
+    </div>
+  </body>
+</html>
