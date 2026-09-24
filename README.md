@@ -55,11 +55,12 @@ The application requires all three APIs below and valid bearer tokens for them. 
 - Single repo with a Python FastAPI backend and a static SPA frontend.
 - Backend mounts static directories and serves:
   - `/` — public sign-in page
-  - `/app` — authenticated SPA entry
-  - `/docs` — API documentation for API-enabled normal users
-  - `/qsg` — authenticated Quick Start Guide
-  - `/documentation` — authenticated user documentation
-  - `/api/*` — authenticated lookup and modelling routes
+  - `/app` — SPA entry
+  - `/docs` — authenticated API documentation for API-enabled users
+  - `/qsg` — Quick Start Guide
+  - `/documentation` — user documentation
+  - `/login` — authentication page for administrators and API-enabled users
+  - `/api/*` — lookup and modelling routes
 
 ## Getting started
 Prerequisites
