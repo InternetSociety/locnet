@@ -6,6 +6,18 @@ type Props = PropsWithChildren<{
   dialogHeader: string;
 }>;
 
+type DialogBounds = Pick<DOMRect, 'top' | 'right' | 'bottom' | 'left'>;
+
+export const isOutsideDialog = (
+  clientX: number,
+  clientY: number,
+  bounds: DialogBounds,
+) =>
+  clientX < bounds.left ||
+  clientX > bounds.right ||
+  clientY < bounds.top ||
+  clientY > bounds.bottom;
+
 export const IframeModalButton = ({ url, dialogHeader, children }: Props) => {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const iframeUrl = `${url}${url.includes('?') ? '&' : '?'}embedded=true`;
@@ -19,14 +31,13 @@ export const IframeModalButton = ({ url, dialogHeader, children }: Props) => {
     dialogRef.current.showModal();
   };
 
-  const closeModal = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    e.preventDefault();
-    if (!dialogRef.current) {
-      console.log("didn't find dialog ref");
-      return;
+  const closeModalFromBackdrop = (
+    e: React.MouseEvent<HTMLDialogElement, MouseEvent>,
+  ) => {
+    const dialog = e.currentTarget;
+    if (isOutsideDialog(e.clientX, e.clientY, dialog.getBoundingClientRect())) {
+      dialog.close();
     }
-    dialogRef.current.close();
-    console.log(dialogRef.current.open);
   };
 
   return (
@@ -34,16 +45,18 @@ export const IframeModalButton = ({ url, dialogHeader, children }: Props) => {
       <a href={url} onClick={openModal}>
         {children}
       </a>
-      <dialog ref={dialogRef} className={styles.dialog}>
+      <dialog
+        ref={dialogRef}
+        className={styles.dialog}
+        aria-label={dialogHeader}
+        onClick={closeModalFromBackdrop}
+      >
         <div className={styles.dialogHeader}>{dialogHeader}</div>
-        <iframe src={iframeUrl} className={styles.dialogIframe}></iframe>
-        <button
-          type="button"
-          className={styles.dialogClose}
-          onClick={closeModal}
-        >
-          &times;
-        </button>
+        <iframe
+          src={iframeUrl}
+          className={styles.dialogIframe}
+          title={dialogHeader}
+        ></iframe>
       </dialog>
     </>
   );

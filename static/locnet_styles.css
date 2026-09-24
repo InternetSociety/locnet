@@ -97,6 +97,12 @@ tr.shown td.details-control {
   padding: 16px 24px 48px 24px;
 }
 
+.markdown-document img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .document-navigation {
   display: flex;
   justify-content: flex-end;

@@ -113,7 +113,7 @@ export const ModelFileControls = () => {
           aria-disabled={isLoading}
           data-testid="load_model"
         >
-          Load Model
+          Load Scenario
         </a>
         <input
           ref={fileInputRef}
@@ -132,7 +132,7 @@ export const ModelFileControls = () => {
           onClick={saveModel}
           data-testid="save_model"
         >
-          Save Model
+          Save Scenario
         </a>
       </li>
     </>

@@ -66,7 +66,7 @@ test('builds version 2 location-derived input without legacy profiles', () => {
   expect(input.model_version).toBe(2);
   expect(input.area_sqkm).toBe(Number((Math.PI * 3 ** 2).toFixed(2)));
   expect(input.households_total).toBe(14);
-  expect(input.total_potential_users).toBeUndefined();
+  expect(input.total_potential_users).toBe(999);
   expect(input).not.toHaveProperty('terrain_type');
   expect(input).not.toHaveProperty('vegetation_type');
   expect(input.locations?.[0]).toMatchObject({

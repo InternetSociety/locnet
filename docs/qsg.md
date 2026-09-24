@@ -11,11 +11,9 @@ The first significant choice to make is to pick a country. When a country is sel
 At the moment it’s not possible to configure a complex network scenario then change the country. If you want to change countries, it’s best to refresh the page to start fresh.
 
 ## Community Characteristics
-In the first section of user input, set your community's household income. If you're starting the network build with a grant, add that amount to the CapEx subsidy.
+In the first section of user input, set your community's household income and expected growth rate. If your community has businesses or community service providers (like government offices, clinics, libraries, etc.) input how many, and on average how many people each employs.
 
 ![locnet community chars](images/qsg_household_income.png)
-
-If your community has businesses or community service providers (like government offices, clinics, libraries, etc.) input how many, and on average how many people each employs.
 
 ## Select a Technology and Frequencies
 Pick as many technologies as you think you’ll want to implement, but remember that sustainable community networks are often simple.

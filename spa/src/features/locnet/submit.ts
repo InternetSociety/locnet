@@ -101,7 +101,6 @@ export const locnetModelToBuilderInput = (
     model_version: 2,
     area_sqkm: calculateLocationsAreaSqKm(model.locations ?? []),
     households_total: calculateOverrideHouseholds(model.locations ?? []),
-    total_potential_users: undefined,
     locations: model.locations?.map(networkElementToLocationData) ?? [],
   };
 };

@@ -9,13 +9,9 @@ The Association for Progressive Communications (APC) commissioned Systems Knowle
 
 Systems Knowledge Concepts is an Australian economics consultancy specialising in telecommunications and economic development. Telco2 designs and builds innovative networks for broadband, public safety, utilities, and the Internet of Things.
 
-Simon Molloy and Barry Burgan of SKC worked with Jonathan Brewer of Telco2 to develop and integrate the model into an Excel sheet. This team collaborated with Carlos Rey-Moreno and Mike Jensen of APC on the work in 2024.
+Simon Molloy and Barry Burgan of SKC worked with Jonathan Brewer of Telco2 to develop and integrate the model into an Excel sheet. This team collaborated with Carlos Rey-Moreno and Mike Jensen of APC on the work in 2024.  Telco2 ported the Excel model to Python and developed a web user interface for it in 2025.
 
-Telco2 ported the Excel model to Python and developed a web user interface for it in 2025.
-
-An advisory committee was set up to accompany this process. The members of the committee were
-Jane Coffin, Revi Sterling, Laina Green, Steve Song, Ben Matranga and representatives of Connect
-Humanity (initially Jochai Ben-Avie, and later Erica Mesker, Brian Vo and Nathalia Foditsch).
+An advisory committee was set up to accompany this process. The members of the committee were  Jane Coffin, Revi Sterling, Laina Green, Steve Song, Ben Matranga and representatives of Connect Humanity (initially Jochai Ben-Avie, and later Erica Mesker, Brian Vo and Nathalia Foditsch).
 
 The development of this application is part of the Local Networks initiative, a collective effort led by APC and Rhizomatica in partnership with grassroots communities and support organisations in Africa, Asia and Latin America and the Caribbean. Its production was supported by the "Meaningful community-centred connectivity" project implemented with financial support from the Swedish International Development Cooperation Agency (Sida) and UK International Development from the UK Government through its Digital Access Programme. The views expressed here do not necessarily reflect the supporters' views.
 
@@ -26,29 +22,22 @@ The model enables a wide range of ‘what if’ scenarios to be explored. On the
 
 These outcome measures enable the user to experiment with different scenarios by changing the model settings and seeking solutions that will provide the best outcome for users at the minimum cost over the life of the network. In colloquial teams, the model encompasses all the major technologies deployed (fiber, wireless, satellite, public access) and enables the user to search for the ‘best bang for buck’ solution.
 
-It is important to emphasise that identifying the optimal solution requires solving, not only engineering, but also economic problems. It is one thing to provide a technically effective connectivity solution. It is another to provide one that individuals can afford to buy, and that will be economically sustainable.
+Identifying an optimal solution requires both engineering and economic problems. It is one thing to provide a technically effective connectivity solution. It is another to provide one that individuals can afford to buy, and that will be economically sustainable.
 
 Building financial models requires abstraction from reality and simplification. In reality, every under-serviced community is unique, with a complex set of contexts and characteristics. This complex reality not only makes it difficult for the designers of connectivity systems to determine the most efficient communications solutions for each community, but it also makes it hard to create a financial model that is applicable to a wide range of circumstances.
 
 While there are many differences between communities, there are also many common characteristics. Some of the characteristics that influence the choice of broadband provisioning solutions in any community include:
 
-demographics: population size, growth rates, age distribution, user types
-
-spatial: size of service area, its shape, topography and distance from urban areas where backhaul links may be found
-
-economic: income levels, income distribution, prevalence of market-based activities and cash incomes, cost of finance, cost of equipment, the availability and extent of subsidies, required operating margin.
+- Demographics: population size, growth rates, age distribution, user types
+- Geography: size of service area, its shape, topography and distance from urban areas where backhaul links may be found
+- Economic: income levels, income distribution, prevalence of market-based activities and cash incomes, cost of labour, cost of finance, cost of equipment, the availability and extent of subsidies, and the required operating margin.
 
 In addition, there are multiple technical considerations such as:
-
-type of broadband technology to be used
-
-the nature and cost of options for backhaul connectivity
-
-availability and reliability of power
-
-the frequency and amount of spectrum available
-
-terrain and vegetation characteristics (which affect signal propagation).
+- type of broadband technology to be used
+- the nature and cost of options for backhaul connectivity
+- availability, reliability, and cost of power
+- the frequency and amount of spectrum available 
+- terrain and vegetation characteristics (which affect signal propagation).
 
 In order to provide analytical leverage and insight, the model necessarily abstracts from real-world complexity. Within the modelling framework, an underserved community is represented as a ‘scenario’. Within the model, a scenario is defined by the model as the set of user-entered parameter values that characterize the community being investigated.
 
@@ -57,18 +46,19 @@ This list of relatively ‘mechanistic’ parameters is not intended to suggest 
 ### 1.3 Overview of model structure and components
 The model is made up of four main components:
 
-A user input section where parameter values are entered to characterise the target community (described in more detail in Section 2). Also, a choice of technologies that could be used to serve the connectivity needs of the community is available for selection from a menu of FWA, GPON, LTE and WiFi options.
+- A user input section where parameter values are entered to characterise the target community (described in more detail in Section 2). Also, a choice of technologies that could be used to serve the connectivity needs of the community is available for selection from a menu of FWA, GPON, LTE and WiFi options.
 
-A Broadband Technology Module (BTM) that processes relevant parameter values and determines technical outcomes such as number of users supported, coverage area, power requirements and all associated CapEx and OpEx costs.
+- A Broadband Technology Module (BTM) that processes relevant parameter values and determines technical outcomes such as number of users supported, coverage area, power requirements and all associated CapEx and OpEx costs.
 
-A Broadband Demand Module (BDM) that processes user-defined parameter values and outputs of the technology module, filtering these through a demand analysis to determine the expected number of users, adoption levels, financial performance and economic benefit outcomes (see Section 4).
+- A Broadband Demand Module (BDM) that processes user-defined parameter values and outputs of the technology module, filtering these through a demand analysis to determine the expected number of users, adoption levels, financial performance and economic benefit outcomes (see Section 4).
 
-An output section that summarises all of the main community, network, financial and economic benefit outcomes. (see Section 3)
+- An output section that summarises all of the main community, network, financial and economic benefit outcomes. (see Section 3)
 
  Figure 1 below provides a high-level illustration of the model.
 
 ![Model overview](images/Screenshot_2025-08-01_at_09.44.11.png)
-The user of the model enters parameter values in the user interface that characterises the community and technology / business scenario being investigated. The model takes these values and passes them to the BTM which component estimates the number of users that can be supported, and the associated capital and operational costs, including power costs. These results are then passed to the BDM. The BDM combines the results from the BTM with other parameter values from the user interface. For example, the price of connectivity services is derived from the cost of providing the service (Capex and Opex), the number of expected users (in the different user categories) and the required operating margin.
+
+The user of the model enters parameter values in the user interface that characterises the community and technology / business scenario being investigated. The model takes these values and passes them to the BTM which estimates the number of users that can be supported, and the associated capital and operational costs, including power costs. These results are then passed to the BDM. The BDM combines the results from the BTM with other parameter values from the user interface. For example, the price of connectivity services is derived from the cost of providing the service (Capex and Opex), the number of expected users (in the different user categories) and the required operating margin.
 
 Using demand modelling parameters the BDM, in a sense ‘filters’ the results of the BTM by determining how many users will actually pay for the service, that is, become ‘adopters’ or ‘subscribers’, based on average incomes, willingness to pay and service price.
 
@@ -76,25 +66,17 @@ It is this combination of technical and economic modelling at the community leve
 
 The size of these communities can vary significantly in population and geographic extent but the connectivity solutions are regarded a single self-contained solution for a community as defined in the user interface. Section 3 describes in more detail the underlying economics of the model.
 
-The BDM is implemented in Python currently implemented in an Excel workbook with a set of spreadsheets containing different components of the model. The first tab, called ‘User interface’ - is the only spreadsheet that users need to interact with. The BTM resides on an independent web server along with a set of databases. 
-
 The next section describes how model users interact with the model and interpret its results.
 
 ### 1.4 Terminology
 #### 1.4.1 Users and their types
-The terms ‘user’ and ‘users’ appear frequently throughout this document. If the reference is to individuals who interact with the model, the terms ‘model user’ or ‘user of the model’ are used.
+The terms ‘user’ and ‘users’ appear frequently throughout this document. If the reference is to individuals who interact with the model, the terms ‘model user’ or ‘user of the model’ are used. If the reference is to a community user of the connectivity solution, the term ‘user’ applies. This will often be modified as follows:
 
-If the reference is to a community user of the connectivity solution, the term ‘user’ applies. This will often be modified as follows:
-
-potential user: an individual who may eventually adopt the solution but has not yet used it, with this figure being equal to the number of households multiplied by the number of users per household.
-
-a non-user: an individual who will not become a subscriber or use a PAF. For most economies available to the model, the percent of non-users per household is pre-populated with an estimate based on population distribution from the 2024 UN World Population Prospects. Household members ten years or younger, and eighty years or older are considered non-users. The proportion of non-users is adjustable in the Expert Options section of the user interface.
-
-a user: an individual who has adopted the solution, also a ‘solution user’.
-
-a deterred user: a user who would have become a subscriber but chooses not to because this user finds Public Access Facilities (PAF) more attractive. The sense in which the word is used, is that a potential user is deterred from becoming a subscriber if a PAF is available.
-
-a PAF-user: an individual who would not become a user of a subscribed service (at the current parameter values) but would use a PAF.
+- potential user: an individual who may eventually adopt the solution but has not yet used it, with this figure being equal to the number of households multiplied by the number of users per household.
+- a non-user: an individual who will not become a subscriber or use a PAF. For most economies available to the model, the percent of non-users per household is pre-populated with an estimate based on population distribution from the 2024 UN World Population Prospects. Household members ten years or younger, and eighty years or older are considered non-users. The proportion of non-users is adjustable in the Expert Options section of the user interface.
+- a user: an individual who has adopted the solution, also a ‘solution user’.
+- a deterred user: a user who would have become a subscriber but chooses not to because this user finds Public Access Facilities (PAF) more attractive. The sense in which the word is used, is that a potential user is deterred from becoming a subscriber if a PAF is available.
+- a PAF-user: an individual who would not become a user of a subscribed service (at the current parameter values) but would use a PAF.
 
 #### 1.4.2 Decision makers: households, service providers, businesses and individuals
 In order for a ‘demand driven’ model to function, it is necessary to define carefully what entity is making economic decisions – who is doing the demanding?
@@ -131,50 +113,36 @@ Throughout the model most parameters have range limitations on them, and user in
 The selection of connectivity technologies to be used is then outlined in the following section.
 
 #### 2.3.0 Select your Country
-Country selection populates a number of default variables into the model based on available demographic data and physical location data. In this version of the application, configuring a model then changing the country can have unpredictable results. It’s best to refresh the page entirely before starting a model in a different country.
+Country selection populates a number of default variables into the model based on available demographic data and physical location data. Configuring a model then changing the country can have unpredictable results. It’s best to refresh the page entirely before starting a model in a different country.
+
+![qsg_select_country.png](images/qsg_select_country.png)
 
 ##### 20.3.0.1 Default Variable Sources
-In all cases where data is present in the recent past, a value is drawn from the most recent year available in the data sets below. This means that, for example, if 2021 is the latest population data available for a country in the 2024 data set, the 2021 data will be used.
+In all cases where data is present in the recent past, a value is drawn from the most recent year available in the data sets below. This means that, for example, if 2021 is the latest population data available for a country in the 2024 data set, the 2021 data will be used. Data sources used include:
 
-Population Data: United Nations World Population Prospects 2024
+- Corporate Tax Rates: Aswath Damodaran Country Default Spreads and Risk Premiums 2025
+- GDP Per Capita: World Bank 2023
+- Household Size: United Nations Department of Economic and Social Affairs 2022
+- Inflation: International Monetary Fund 2024 via World Bank
+- Location-specific Population: Worldpop v2 2025a
+- Location-specific Terrain: Copernicus GLO-30 DSM
+- Location-specific Vegetation: ESA Worldcover
+- Population Data: United Nations World Population Prospects 2024
+- Population Growth Data:  World Bank 2023
+- Power Pricing: World Bank Doing Business 2019
 
-World Population Prospects 
-
-Household Size: United Nations Department of Economic and Social Affairs 2022
-
-https://www.un.org/development/desa/pd/household-size-and-composition
-
-GDP Per Capita: World Bank 2023
-
-World Bank Open Data 
-
-Population Growth Data:  World Bank 2023
-
-World Bank Open Data 
-
-Power Pricing: World Bank Doing Business 2019
-
-Doing Business | DataBank 
-
-Inflation: International Monetary Fund 2024 via World Bank
-
-World Bank Open Data 
-
-#### 2.3.1 Community characteristics
-Values for the Community characteristics parameters are shown below. The parameters have basic default values set, so if the model user is in doubt, the value can be left as-is. 
-
-![Community characteristics](images/locnet_community_chars.png)
-Model users can input values for the coverage area in km2 required, the total number of households in the coverage area, the expected population growth rate, and the weekly household income. Since these values are community averages, fractional values are allowed, also, such as for Area, where many villages will be much smaller than 1sq km. The other parameters are self-explanatory.
-
-The value for total potential users, hidden in the Expert Options section, is derived from the number of households input in this section multiplied by the household size, minus the percent of non-users.
+#### 2.3.1 Community Characteristics
+Values for the Community characteristics parameters are shown below. The parameters have basic default values set, so if the model user is in doubt, the value can be left as-is. Model users can the expected population growth rate and the weekly household income.
 
 In the Additional User Types section, model users define the number of businesses and service provider organisations in the community, and the average number of employees or telecommunications services users associated with each entity type.
 
+Network area in km^2 and total number of households will be configured on a per-location basis in the Network Elements section. 
+
+![qsg_household_income.png](images/qsg_household_income.png)
+
 #### 2.3.2 Technology Selection
 Technology choices are of paramount importance in building community broadband coverage. While a network may have several (or all) technologies, limiting the scope of the network limits the complexity a user is exposed to in the network builder section.
-
-![Technology selection](images/tech_freq_and_env.png)
- 
+![qsg_technologies_frequencies.png](images/qsg_technologies_frequencies.png)
 
 ##### 2.3.2.1 Fixed Wireless
 A microcell or small-cell solution used for fixed wireless data-only access. Users connect to the network with a terminal typically installed on their rooftop, the side of their dwelling, or in a window. The terminal provides a Wi-Fi hotspot that acts as a connection for the entire household.
@@ -187,25 +155,39 @@ Gigabit Passive Optical Network, or GPON, is a fibre to the premises technology.
 
 ##### 2.3.2.3 Public Access Facility
 Internet Cafés, libraries, community centres, and schools with public access computer rooms can all be considered a Public Access Facilitie (PAF). This model assumes users are charged for access to the facility, and that the presence of a PAF might reduce the use of other technologies as it can be a less expensive option for users with limited needs and/or means.
+![qsg_paf.png](images/qsg_paf.png)
+When a user selects PAF as a technology for use in the model, an additional configuration section becomae available. In that section users can enter the amount of use by each of three user profiles: non-subscribers, subscribers, and deterred users. The supply model can’t know the percent of users that will be assigned to each category, as these figures are calculated after the total solution cost is determined and its affordability assessed against the demand curve. Absent the exact breakdown the supply model takes the highest predicted use in hours of the three categories, and uses this to determine the loading on the PAF. The Broadband Technology Model estimates that seats will be open 10 hours per day, six days per week, but occupied 50% of the time, allowing for 129 hours of PAF use per seat per month. The Demand Model allows the seats to be occupied 100% of the time.
 
-When a user selects PAF as a technology for use in the model, they’re prompted to enter the amount of use by each of three user profiles: non-subscribers, subscribers, and deterred users. The supply model can’t know the percent of users that will be assigned to each category, as these figures are calculated after the total solution cost is determined and its affordability assessed against the demand curve. Absent the exact breakdown the supply model takes the highest predicted use in hours of the three categories, and uses this to determine the loading on the PAF. The model  estimates that seats will be open 10 hours per day, six days per week, but occupied 50% of the time, allowing for 129 hours of PAF use per seat per month. For the demand model this figure is doubled to show true availability of seats.
+##### 2.3.2.3.1 PAF use by a Deterred User
+A 'deterred user' is one who would have become a subscriber to the community network, but decides not to because of the availability of Public Access Facilities. This figure is an estimate of the average number of hours per month per deterred user. It impacts the capacity and availability of the facilities. When PAF is the only solution configured by a user of the model, this figure is set to zero regardless of user input. 
+
+##### 2.3.2.3.2  PAF use by a Subscriber
+This field is an estimate of the number of hours that subscribers to alternative community network solutions will use the PAF. The number of PAF users will vary with the number of terminals. We assume terminals are available 12 hours a day 365 days a year. The number of PAF users is a function of the number of terminals supplemented by a congestion factor. When PAF is the only solution configured by a user of the model, this figure is set to zero regardless of user input. 
+
+##### 2.3.2.3.3  PAF use by a Non-Subscriber
+A ‘non-subscriber’ is a community member who would not have subscribed to a community network offering (at current parameter values). The average number of hours per month that ‘non-subscribers’ use the PAFs is entered here.
+
+##### 2.3.2.3.4  Use of Internet Traffic Per Hour
+This is the traffic in Gigabytes (GB) per hour generated by the average user of the PAF. It’s used to help dimension the backhaul network and to determine the cost of providing the traffic.
+
+##### 2.3.2.3.5  Charge for Public Access Facilities Use
+This is the hourly charge for use of a PAF terminal and is expressed as a proportion of weekly household income per hour of use. By default the charge is 1/2 of 1 percent of weekly household income per hour. Adjusting the percentage here will adjust the USD fee used in the model.
 
 #### 2.3.3 Frequency Selection
-Builders of Fixed Wireless and Mobile networks might have access to dedicated radio spectrum. The frequency available has an impact on both coverage and solution cost. Wi-Fi bands that are universally available (or nearly so) are selected by default and cannot be unselected.
+When radio technologies are chosen for the network, a frequencies dialog becomes available. Builders of Fixed Wireless and Mobile networks might have access to dedicated radio spectrum. The frequency available has an impact on both coverage and solution cost. Wi-Fi bands that are universally available (or nearly so) are selected by default and cannot be unselected.
 
-![Frequency and environment](images/tech_freq_and_env.png)
+![qsg_technologies_frequencies.png](images/qsg_technologies_frequencies.png)
+
 Lower frequencies have greater coverage, especially in the presence of vegetation. The equipment is larger, more expensive, and uses more power than higher frequency equipment - and so has higher Capital and Operational expenses. Higher frequency equipment is physically smaller, and uses less power, but provides far less coverage in the presence of vegetation. 
 
-#### 2.3.4 Physical environment characteristics
-For wireless networks, the characteristics of the terrain and vegetation may have a significant negative impact on signal propagation. This effect is more pronounced the higher the frequency used in the connectivity solution.
+#### 2.3.4 Physical Environment Characteristics
 
-Terrain: the user selects a terrain type from the drop-down list that best matches local conditions. 
+Previous versions of the application asked users to etimate the terrain and vegetation surrounding their networks. The current version draws this data dynamically based on each network location configured by a model user.
 
-Terrain is a coarse control for model users to estimate how terrain may block signals from a tower location to end users. In the event hills or mountains prevent half of users in a normal coverage area from line of sight to a tower location, “Very High Variation” can be selected and coverage area will be reduced by 50%.
+- Terrain: A viewshed is first created based on the structure's height, the minimum of the user's requested coverage radius and the technology's maximum coverage radius, and a pure line of sight calculation.
+- Vegetation: The viewshed is then reduced based on the proportion of territory covered in forest.
 
-Vegetation: the user selects a vegetation type that best matches local conditions.
-
-The vegetation profile represents how much vegetation (in meters) is between an end user and the nearest communication tower. The more vegetation there is, the more it blocks or weakens the radio signal, limiting coverage. Vegetation absorbs and scatters the signal, and the effect is greater at higher frequencies. You can select from various options, ranging from no vegetation (0 meters) to very high vegetation (100 meters), to account for the impact on your wireless coverage. This helps the model estimate how signal strength will be affected in your environment.
+This methodology provides a fast estimate of coverage suitable for estimating population covered. It is not an ITU recommended methodology for predicting radio propagation.
 
 #### 2.3.5 Organisation Type
 This section of the model enables a user to choose either commercial or community provision of the connectivity solution.
@@ -213,6 +195,7 @@ This section of the model enables a user to choose either commercial or communit
 Commercial organisations require a Return on Investment (ROI) with profit targets, while community operators generally work towards a cost-recovery / non-profit model. Commercial operators also tend to provide higher levels of service. Changing the value in this section changes the default values applied to a number of business and technical variables hidden in the Expert Options. All of these default values are changeable by model users, however the act of selecting an Organisation Type always overwrites custom Expert Option values with defaults.
 
 #### 2.3.6 Expert Options: Business Options
+
 ##### 2.3.6.1 Labour Cost
 Cost of labour has a major impact on both Community and Commercial provision of networks. Where data is available, the estimated figures for household income and labour cost are derived from GDP per capita and household size. Where no data is available, the figure may be shaded red as a warning it must be changed in order for the model to have any degree of accuracy.
 
@@ -250,13 +233,10 @@ WACC is defined as the average rate a company pays to finance its assets. It is 
 
 WACC is calculated using the following formula 𝑊𝐴𝐶𝐶=𝑅𝑒⋅𝐸+𝑅𝑑⋅𝐷 where:
 
-Re: Return on equity, or cost of equity
-
-Rd: Return on debt, or cost of debt
-
-E: Proportion of business funded by equity
-
-D: Proportion of business funded by debt
+- Re: Return on equity, or cost of equity
+- Rd: Return on debt, or cost of debt
+- E: Proportion of business funded by equity
+- D: Proportion of business funded by debt
 
 It should be noted that WACC ex ante may be different to WACC ex post. A company may have debt that is subject to variable interest rates. If these interest rates change over the accounting period, anticipated and actual WACC will differ.
 
@@ -268,7 +248,7 @@ This cost of financing needs to be added to the other OpEx, and CapEx costs asso
 Inflation is used throughout the demand and financial model. The default figure of 3% should be adjusted for the local market.
 
 ##### 2.3.6.13 Corporate Tax Rate
-For community operators, this is set by default to 0, and for commercial operators to 10%. If a commercial operator is being modelled, set this figure appropriately for the local environment.
+For community operators, this is set by default to 0, and for commercial operators a rate depending on the country selected. If a commercial operator is being modelled, make sure to set this figure appropriately.
 
 ##### 2.3.6.14 Initial Spectrum Licence Fee
 Any fees to use spectrum over the life of the project should be included here, in USD.
@@ -302,31 +282,13 @@ By default this model considers children under ten and adults over eighty years 
 This figure is unchangeable in the model, as it is derived from the household size and the percent of non-users per household.
 
 ##### 2.3.7.6 Total potential users
-The model users limit the number of potential users of the system in multiple ways. First it determines  how many households are present in the study area. Out of those households it limits the users to household members above 10 years and below 80 years of age. Household users are then added to Service Provider users and Business users to determine the total potential users of the network. This treatment can result in an over-estimation of peak hour demand, as peak hour use profiles differ between service providers and business users. It may be corrected in the future.
+Previous versions of the model estimated total potential users based on the number of estimated households, household size, and number of non-users per household. In the current version of the model, the number of households is found after coverage is modeled. The total potential users supplied to the Demand module is calculated entirely inside the Supply module.
 
 ##### 2.3.7.7 Users above Median Income with Internet Capable Phones
 The demand model breaks users into groups above and below median income, and treats their ability to pay and consumption of services differently. One key factor is pre-existing access to an Internet-capable handset. The default figure of 30% means that 70% of users in this market segment will need to buy a handset in order to use the community network.
 
 ##### 2.3.7.8 Users above Median Income with Internet Capable Phones
 For users below median income, the default figure of 10% means 90% of users in this market segment will need to buy a handset in order to use the network.
-
-#### 2.3.8 Expert Options: Public Access Facility Options
-Public Access Facilities (PAFs) are ‘Internet Café’ type facilities that provide connectivity access in a public environment to any community members who needs it, such as those who don’t own access devices. In the online version of the model, the number of facilities and number of seats per facility are configured in the network builder section. Other parameters relating to the impact of PAFs are configured in the Expert Options.
-
-##### 2.3.8.1 PAF use by a Deterred User
-A 'deterred user' is one who would have become a subscriber to the community network, but decides not to because of the availability of Public Access Facilities. This figure is an estimate of the average number of hours per month per deterred user. It impacts the capacity and availability of the facilities. When PAF is the only solution configured by a user of the model, this figure is set to zero regardless of user input. 
-
-##### 2.3.8.2 PAF use by a Subscriber
-This field is an estimate of the number of hours that subscribers to alternative community network solutions will use the PAF. The number of PAF users will vary with the number of terminals. We assume terminals are available 12 hours a day 365 days a year. The number of PAF users is a function of the number of terminals supplemented by a congestion factor. When PAF is the only solution configured by a user of the model, this figure is set to zero regardless of user input. 
-
-##### 2.3.8.3 PAF use by a Non-Subscriber
-A ‘non-subscriber’ is a community member who would not have subscribed to a community network offering (at current parameter values). The average number of hours per month that ‘non-subscribers’ use the PAFs is entered here.
-
-##### 2.3.8.4 Use of Internet Traffic Per Hour
-This is the traffic in Gigabytes (GB) per hour generated by the average user of the PAF. It’s used to help dimension the backhaul network and to determine the cost of providing the traffic.
-
-##### 2.3.8.5 Charge for Public Access Facilities Use
-This is the hourly charge for use of a PAF terminal and is expressed as a proportion of weekly household income per hour of use. By default the charge is 1/2 of 1 percent of weekly household income per hour. Adjusting the percentage here will adjust the USD fee used in the model.
 
 #### 2.3.9 Expert Options: Power Options
 Power systems and power use are often the most expensive inputs to providing a network service. In the current model, the user chooses a power system for each network location, and the power model sizes the required batteries, chargers or inverters, and solar panels based on the selected mode, equipment load, and the solar collection potential of the chosen country.
@@ -373,31 +335,50 @@ Hours of standby power to provision for a dual solar and grid system used to sav
 ### 2.4 Network Elements
 This section of the application allows users of the model to configure a technical solution. It is a complex process, and requires a basic understanding of networking technologies.
 
-#### 2.4.1 Add Location
-All networks must have at least one location configured for delivering service. Users will source their connectivity from one or more configured locations. When the “Add Location” button is clicked, users are prompted to name it, and the next set of menus appears.
+#### 2.4.1 Add Network Location
+All networks must have at least one netework location configured for delivering service. For a quick start, just add one location. Multiple location networks are more complex to configure.
+
+![qsg_add_network_elements.png](images/qsg_add_network_elements.png)
+
+#### Configure Network Location
+The first thing you'll see when you add a new location is a map. Move the marker by dragging or double clicking where you want it. This will be your tower or POP location. Make sure you're as accurate as possible - this application takes terrain and vegetation into account.
+
+![qsg_choose_location.png](images/qsg_choose_location.png)
 
 #### 2.4.2 Add Network Type
-The first choice to make is that of a network type. When you click this button, you’ll get a pull-down menu allowing you to select from the available network types. If you don’t see a network option you’re expecting to use, go back and ensure you’ve selected the technology (2.3.2) and any required frequency (2.3.3). Then click the Add Network Type button again to regenerate the list. 
+Once you've selected a location, you need to add a network type.
+![qsg_add_network_type.png](images/qsg_add_network_type.png)
 
-![Network builder (add network type)](images/network_builder_a.png)
-For each radio network type at a location, you will also need to add a number of sectors or antennas. Most sectors technologies support between 64-128 simultaneous connections per antenna. For Public Access Facilities, you add the number of seats, or computers available. For GPON networks, you add a number of cards - each of which supports around 1,000 connections.
+When you click this button, you’ll get a pull-down menu allowing you to select from the available network types. If you don’t see a network option you’re expecting to use, go back and ensure you’ve selected the technology and any required frequency. Then remove the network type and click the Add Network Type button again to regenerate the list.
 
-#### 2.4.3 Choose a Power System and a Tower Type
-The terminology tower is an artefact of a previous version of the application that only supported radio technologies. For this variable, it’s most important to note the cost of the hosting arrangements. If it’s a building being used for a Public Access Facility that needs $5,000 USD of fit-out work, note that in the cost. 
+For each wireless network type at a location, you need to choose how many sectors, or antennas you'll use. Each sector adds network capacity, but also Capital and Operational expenses. For GPON networks, you add a number of cards - each of which supports around 1,000 connections.
 
-![Network builder (power system and tower type)](images/network_builder_b.png)
- 
+![qsg_select_network_type.png](images/qsg_select_network_type.png)
 
-#### 2.4.4 Network Links
+
+#### 2.4.3 Choose a Power System
+
+What power systme you choose depends on a few factors. If you have space for solar panels, hybrid systems that combine mains and solar usually have the lowest cost over the life of the system.
+
+![qsg_select_power_system.png](images/qsg_select_power_system.png)
+
+#### 2.4.4 Choose a Structure
+
+ Capture any building or fit-out expenses in the cost box, and any lease costs in the annual operational expense box. Height is very important for wireless technologies. If you don't set this high enough, you won't get good coverage from your technologies.
+
+![qsg_configure_structure.png](images/qsg_configure_structure.png)
+
+#### 2.4.5 Network Links
 In community networks with more than one location, this version of the model requires that locations are linked together so they can share backhaul. While it’s possible to add backhaul to each individual location, the model still requires network links connecting each location, as backhaul capacity is summed and divided amongst all potential users. Adding network links to a network results in a CapEx charge in the first year of the network’s operation, but does not result in any operational expense.
 
-#### 2.4.5 Backhaul Links
-Backhaul, power, and staff costs are the main operational expenses of any network. Ensuring that backhaul charges are accurately estimated is important if the model is to be relevant and useful.
+#### 2.4.6 Backhaul Links
+Backhaul, power, and staff costs are the main operational expenses of any network. Ensuring that backhaul charges are accurately estimated is important if the model is to be relevant and useful. The unit of traffic cost is Megabits per Second. If your backhaul just has a fixed monthly charge for unlimited traffic, set USD Cost of traffic to 0.
 
-![Network builder (backhaul links)](images/network_builder_c.png)
-Backhaul must be added to at least one location in a network. A method should be chosen, a fixed monthly charge entered, and a cost per Mbps for traffic. The model assumes that cost of backhaul will increase over time with traffic demand, based on the USD cost of traffic per Mbps entered here. 
+![qsg_select_backhaul.png](images/qsg_select_backhaul.png)
+ 
+Backhaul must be added to at least one location in a network. A method should be chosen, a fixed monthly charge entered, and a cost per Mbps for traffic. The model assumes that cost of backhaul will increase over time with traffic demand, based on the USD cost of traffic per Mbps entered here.
 
-For each location, the model looks at provisioned backhaul to find how many will be supported in the network’s final year of operation. Then it creates a list that will hold details of the OpEx charges per Mbps that that will accrue for each user assigned to the backhaul. This is calculated based on the  average monthly use of a user during the peak hour over each year of service operation.
+For each location, the model looks at provisioned backhaul and the per-user traffic requirements based on initial traffic and expected growth rate. With this information it determines how many users will be supported in the network’s final year of operation using a peak hour demand calculation. Then it creates a list that will hold details of the OpEx charges per Mbps that that will accrue for each user assigned to the backhaul. This is calculated based on the  average monthly use of a user during the peak hour over each year of service operation.
 
 The data is analysed to determine if enough backhaul has been provided to meet the number of users supported by the access network. If backhaul is under-provisioned, more of the cheapest available solution is added. Then users are distributed across the backhauls proportionally to capacity and a blended cost of backhaul OpEx per user is derived. From the sum of all backhauls installed a new backhaul CapEx figure is calculated. Then a new Backhaul OpEx figure is derived from the sum of the fixed monthly cost of the aggregate backhaul, and the blended cost of backhaul per user times the number of users supported.
 
@@ -410,7 +391,8 @@ Once it’s run a set of results will appear below, and all user input will coll
 #### 3.1.1 Summary of Outcomes
 The first section of output, a table displayed once the model is run, is a summary of outcomes described in greater detail in sections below.
 
-![Summary of outcomes](images/summary_of_outcomes.png)
+![qsg_summary_of_outcomes.png](images/qsg_summary_of_outcomes.png)
+
 ##### 3.1.1.1 Solution Capex per potential user
 This is the total solution capital expenditure over the life of the project, including rates of return, divided by the total number of decision makers, that is, the sum of households, service providers and businesses.
 
@@ -484,7 +466,8 @@ The Investment and Operating Cash Flow statement is an alternative view of many 
 ### 3.5 Demand Curve
 A demand curve is a representation (mathematical or graphical) of the relationship between the price of a good or service in a market and the quantity demanded by consumers. The demand curve used in the model, explained in detail in section 4 of the documentation, is represented here.
 
-![Demand curve (screenshot)](images/Screenshot_2025-08-06_at_21.11.53.png)
+![qsg_demand_curve.png](images/qsg_demand_curve.png)
+
 ### 3.6 Network Details
 This table re-states some model parameters, and summarises some key facts about the complete network, including some traffic statistics and a breakdown of costs for elements of the network.
 
@@ -494,6 +477,13 @@ The final set of results is a detailed breakdown of each location of the technic
 
 ![Network elements](images/network_elements.png)
  
+### 3.8 Network Equipment Bill of Materials
+
+A table of network equipment quantaties and costs with one row for each technology at a particular location.
+
+### 3.9 Power and Structure Bill of Materials
+
+A table of equipment quantities and costs specific to the structure and power system, with one row per location.
 
 ## 4 The Broadband Demand Module
 While the BTM determines the technical and cost outcomes for each user-defined broadband solution, it does not tell us how many users will use the service. This is determined by the interaction between the price of the service and its quality characteristics, potential users’ incomes, and individuals’ preferences and willingness to pay.
@@ -519,9 +509,8 @@ It can easily be seen that the position and shape of the demand curve will signi
 
 The validity of a demand-based analysis is predicated on two assumptions:
 
-that individuals are able to make voluntary decisions in their own interests
-
-that individuals will pay for a service only if it makes them better off (more specifically, if their subjective evaluation of the benefit of buying the good or service is higher than the price they need to pay).
+- that individuals are able to make voluntary decisions in their own interests
+- that individuals will pay for a service only if it makes them better off (more specifically, if their subjective evaluation of the benefit of buying the good or service is higher than the price they need to pay).
 
 Importantly, because the analysis is grounded in demand theory, in addition to the calculation of financial outcomes, the module also generates a measure of the economic benefit arising from the operation of the broadband service within the community. The estimate is based on the concept of ‘consumer surplus’ – the benefit that consumers receive from using the services that is in excess of the price they pay to get access to it.
 
@@ -537,9 +526,8 @@ It may be useful to distinguish more clearly economic benefits and social benefi
 ### 4.3 General characteristics of internet services
 The cost of internet services from a customer perspective is made up of two components: 
 
-The monthly user charge to access the service 
-
-The cost of equipment required to access (eg router) and make use of the service (eg computer, tablet, smartphone).  It should be noted that this second group of equipment has much broader uses than internet access 
+- The monthly user charge to access the service
+- The cost of equipment required to access (eg router) and make use of the service (eg computer, tablet, smartphone).  It should be noted that this second group of equipment has much broader uses than internet access 
 
 In general, it would be expected that in any community there would be a small number of users who would place very high value on internet services, call them the ‘early adopters’. These would include community service organizations (health and education), and to a lesser extent businesses that trade or could trade with outside communities. Within households there would be some users who place high value on information on entertainment (and in this context internet access is likely to be a superior good). 
 
@@ -558,21 +546,15 @@ UC=α+β ln(PR)𝑈𝐶=𝛼+𝛽 𝑙𝑛𝑃𝑅
 
 Where: 
 
-UC is the monthly user charge + private costs for internet use as a proportion of monthly disposable income 
-
-PR is penetration rate in potential users in the population (the proportion of the market that takes up the service 
-
-The population is defined as individual units of decision making (and so for businesses it is the whole business - assumed to average 4 employees, and for households also assumed to be 4 potential users) 
-
-α – the constant function (sets the height of the demand curve and defines where penetration rate will be zero 
-
-β – the slope of the demand curve (in this case downwards)
+- UC is the monthly user charge + private costs for internet use as a proportion of monthly disposable income 
+- PR is penetration rate in potential users in the population (the proportion of the market that takes up the service 
+- The population is defined as individual units of decision making (and so for businesses it is the whole business - assumed to average 4 employees, and for households also assumed to be 4 potential users) 
+- α – the constant function (sets the height of the demand curve and defines where penetration rate will be zero 
+- β – the slope of the demand curve (in this case downwards)
 
 The parameters for the model have been set by assuming that at a UC = 20% of income there will be very few users, that it will increase slightly as UC increases to around 5% and from that point the increases will be more dramatic, with penetration rates.  This is based on expectation related to observation of markets and roughly accords with a range of values that are consistent with ITU’s affordability measures for broadband services in developing economies.[1]
 
-Based on this the underlying demand curve is as follows (see Figure 3):
-
-UC=.0336+.0158 ln(PR)
+Based on this the underlying demand curve is as follows (see Figure 3): UC=.0336+.0158 ln(PR)
 
  The model provides for two categories of household income: ten percent above median incomes and ten per cent below.
 
@@ -593,9 +575,7 @@ Area under the curve =
 
  Where c is the integration constant and set close to zero 
 
-The total amount paid by all customers =
-
-UC− PR∗𝑈𝐶− 𝑃𝑅∗
+The total amount paid by all customers =  UC− PR∗𝑈𝐶− 𝑃𝑅∗
 
 and so the consumer surplus is the difference between the two. 
 

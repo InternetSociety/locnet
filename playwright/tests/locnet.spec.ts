@@ -96,7 +96,6 @@ test("can use example data and generate output", async ({ page }) => {
       case "area_sqkm":
       case "households_total":
       case "users_per_household":
-      case "total_potential_users":
       case "paf_usd_hour":
         // uneditable field
         break;
@@ -116,6 +115,7 @@ test("can use example data and generate output", async ({ page }) => {
       case "solar_derating":
       case "solar_efficiency":
       case "system_life":
+      case "total_potential_users":
       case "traffic_growth":
       case "year_1_traffic":
       case "hh_size":

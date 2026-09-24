@@ -61,7 +61,6 @@ export const RenderCategoryTableForm = ({
           'area_sqkm',
           'households_total',
           'users_per_household',
-          'total_potential_users',
           'paf_usd_hour',
         ].includes(selectedCategory.variable);
 
